@@ -343,13 +343,13 @@ static void resolveVariableWrite(VMContext* ctx, int16_t instanceType, uint32_t 
         default:
             // INSTANCE_SELF or positive instanceType (object index)
             require(ctx->selfVarCount > (uint32_t) varDef->varID);
-            if (shlen(ctx->instaceVarsToBeTraced) != 0) {
+            if (shlen(ctx->instanceVarsToBeTraced) != 0) {
                 GameObject* obj = &ctx->dataWin->objt.objects[ctx->currentInstance->objectIndex];
 
                 char objNameWithVariableName[strlen(obj->name) + 1 + strlen(varDef->name) + 1];
                 snprintf(objNameWithVariableName, sizeof(objNameWithVariableName), "%s.%s", obj->name, varDef->name);
 
-                shouldLogInstance = shgeti(ctx->instaceVarsToBeTraced, obj->name) != -1 || shgeti(ctx->instaceVarsToBeTraced, objNameWithVariableName) != -1 || shgeti(ctx->instaceVarsToBeTraced, "*") != -1;
+                shouldLogInstance = shgeti(ctx->instanceVarsToBeTraced, obj->name) != -1 || shgeti(ctx->instanceVarsToBeTraced, objNameWithVariableName) != -1 || shgeti(ctx->instanceVarsToBeTraced, "*") != -1;
             }
             dest = &ctx->selfVars[varDef->varID];
             break;
@@ -865,6 +865,30 @@ static void handleCall(VMContext* ctx, uint32_t instr, const uint8_t* extraData)
         }
     }
 
+    bool functionIsBeingTraced = false;
+    char* functionArgumentList = nullptr;
+    if (shgeti(ctx->functionCallsToBeTraced, "*") != -1 || shgeti(ctx->functionCallsToBeTraced, funcName) != -1) {
+        functionIsBeingTraced = true;
+
+        functionArgumentList = strdup("");
+        for (int32_t i = 0; i < argCount; i++) {
+            char* display = RValue_toStringFancy(args[i]);
+
+            if (i > 0) {
+                char* tmp = malloc(strlen(functionArgumentList) + 2 + strlen(display) + 1);
+                sprintf(tmp, "%s, %s", functionArgumentList, display);
+                free(functionArgumentList);
+                functionArgumentList = tmp;
+            } else {
+                free(functionArgumentList);
+                functionArgumentList = strdup(display);
+            }
+            free(display);
+        }
+
+        printf("VM: [%s] Calling function \"%s(%s)\"\n", ctx->currentCodeName, funcName, functionArgumentList);
+    }
+
     // Check built-in functions first
     BuiltinFunc builtin = VMBuiltins_find(funcName);
     if (builtin != nullptr) {
@@ -876,6 +900,14 @@ static void handleCall(VMContext* ctx, uint32_t instr, const uint8_t* extraData)
             }
             free(args);
         }
+
+        if (functionIsBeingTraced) {
+            char* returnValueAsString = RValue_toStringFancy(result);
+            printf("VM: [%s] Called built-in function \"%s(%s)\", return value is %s\n", ctx->currentCodeName, funcName, functionArgumentList, returnValueAsString);
+            free(returnValueAsString);
+            free(functionArgumentList);
+        }
+
         stackPush(&ctx->stack, result);
         return;
     }
@@ -889,7 +921,7 @@ static void handleCall(VMContext* ctx, uint32_t instr, const uint8_t* extraData)
 
         if (0 > shgeti(ctx->loggedUnknownFuncs, dedupKey)) {
             shput(ctx->loggedUnknownFuncs, dedupKey, true);
-            fprintf(stderr, "VM: Unknown function '%s' called from '%s'!\n", funcName, callerName);
+            fprintf(stderr, "VM: Unknown function \"%s\" called from \"%s\"!\n", funcName, callerName);
         } else {
             free(dedupKey);
         }
@@ -907,6 +939,13 @@ static void handleCall(VMContext* ctx, uint32_t instr, const uint8_t* extraData)
 
     int32_t codeIndex = ctx->funcMap[mapIdx].value;
     RValue result = VM_callCodeIndex(ctx, codeIndex, args, argCount);
+
+    if (functionIsBeingTraced) {
+        char* returnValueAsString = RValue_toStringFancy(result);
+        printf("VM: [%s] Called script function \"%s(%s)\", return value is %s\n", ctx->currentCodeName, funcName, functionArgumentList, returnValueAsString);
+        free(returnValueAsString);
+        free(functionArgumentList);
+    }
 
     // Free arguments (VM_callCodeIndex copies what it needs)
     if (args != nullptr) {
@@ -1310,7 +1349,8 @@ void VM_free(VMContext* ctx) {
     shfree(ctx->loggedUnknownFuncs);
     shfree(ctx->loggedStubbedFuncs);
     shfree(ctx->globalVarsToBeTraced);
-    shfree(ctx->instaceVarsToBeTraced);
+    shfree(ctx->instanceVarsToBeTraced);
+    shfree(ctx->functionCallsToBeTraced);
     hmfree(ctx->varRefMap);
     hmfree(ctx->funcRefMap);
 

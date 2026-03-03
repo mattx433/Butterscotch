@@ -28,6 +28,7 @@ typedef struct {
     FrameSetEntry* screenshotFrames;
     StringBooleanEntry* globalVarsToBeTraced;
     StringBooleanEntry* instanceVarsToBeTraced;
+    StringBooleanEntry* functionCallsToBeTraced;
     bool headless;
     bool printRooms;
     bool printDeclaredFunctions;
@@ -44,6 +45,7 @@ static void parseCommandLineArgs(CommandLineArgs* args, int argc, char* argv[]) 
         {"print-declared-functions", no_argument,  nullptr, 'p'},
         {"trace-global-vars", required_argument,         nullptr, 't'},
         {"trace-instance-vars", required_argument,         nullptr, 'i'},
+        {"trace-function-calls", required_argument,         nullptr, 'c'},
         {nullptr,               0,                 nullptr,  0 }
     };
 
@@ -81,6 +83,9 @@ static void parseCommandLineArgs(CommandLineArgs* args, int argc, char* argv[]) 
             case 'i':
                 shput(args->instanceVarsToBeTraced, optarg, true);
                 break;
+            case 'c':
+                shput(args->functionCallsToBeTraced, optarg, true);
+                break;
             default:
                 fprintf(stderr, "Usage: %s [--headless] [--screenshot=PATTERN] [--screenshot-at-frame=N ...] <path to data.win or game.unx>\n", argv[0]);
                 exit(1);
@@ -104,6 +109,7 @@ static void freeCommandLineArgs(CommandLineArgs* args) {
     hmfree(args->screenshotFrames);
     shfree(args->globalVarsToBeTraced);
     shfree(args->instanceVarsToBeTraced);
+    shfree(args->functionCallsToBeTraced);
 }
 
 // ===[ SCREENSHOT ]===
@@ -185,7 +191,8 @@ int main(int argc, char* argv[]) {
     // Initialize the runner
     Runner* runner = Runner_create(dataWin, vm);
     shcopyFromTo(args.globalVarsToBeTraced, runner->vmContext->globalVarsToBeTraced);
-    shcopyFromTo(args.instanceVarsToBeTraced, runner->vmContext->instaceVarsToBeTraced);
+    shcopyFromTo(args.instanceVarsToBeTraced, runner->vmContext->instanceVarsToBeTraced);
+    shcopyFromTo(args.functionCallsToBeTraced, runner->vmContext->functionCallsToBeTraced);
 
     // Init GLFW
     if (!glfwInit()) {

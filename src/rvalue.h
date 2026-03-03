@@ -80,6 +80,28 @@ static char* RValue_toString(RValue val) {
     return strdup("");
 }
 
+// Converts an RValue to a heap-allocated string representation, used for debug logs.
+// The caller must free the returned string
+static char* RValue_toStringFancy(RValue val) {
+    switch (val.type) {
+        case RVALUE_STRING: {
+            char* valueAsString = RValue_toString(val);
+
+            // length + quotes (2) + null terminator
+            int newLength = strlen(valueAsString) + 3;
+            char* valueWithQuotes = calloc(newLength, sizeof(char));
+            snprintf(valueWithQuotes, newLength, "\"%s\"", valueAsString);
+
+            free(valueAsString);
+
+            return valueWithQuotes;
+        }
+        default: {
+            return RValue_toString(val);
+        }
+    }
+}
+
 static void RValue_free(RValue* val) {
     if (val->type == RVALUE_STRING && val->ownsString && val->string != nullptr) {
         free((void*) val->string);

@@ -36,27 +36,9 @@ static RValue builtinShowDebugMessage(VMContext* ctx, RValue* args, int32_t argC
         return (RValue){ .type = RVALUE_UNDEFINED };
     }
 
-    RValue* val = &args[0];
-    switch (val->type) {
-        case RVALUE_REAL:
-            printf("%.16g\n", val->real);
-            break;
-        case RVALUE_INT32:
-            printf("%d\n", val->int32);
-            break;
-        case RVALUE_INT64:
-            printf("%lld\n", (long long) val->int64);
-            break;
-        case RVALUE_STRING:
-            printf("%s\n", val->string != nullptr ? val->string : "(null)");
-            break;
-        case RVALUE_BOOL:
-            printf("%s\n", val->int32 ? "1" : "0");
-            break;
-        case RVALUE_UNDEFINED:
-            printf("undefined\n");
-            break;
-    }
+    char* val = RValue_toString(args[0]);
+    printf("%s\n", val);
+    free(val);
 
     return (RValue){ .type = RVALUE_UNDEFINED };
 }
@@ -119,65 +101,35 @@ static RValue builtinString(VMContext* ctx, RValue* args, int32_t argCount) {
 static RValue builtinFloor(VMContext* ctx, RValue* args, int32_t argCount) {
     (void) ctx;
     if (1 > argCount) return (RValue){ .real = 0.0, .type = RVALUE_REAL };
-    double val = 0.0;
-    switch (args[0].type) {
-        case RVALUE_REAL: val = args[0].real; break;
-        case RVALUE_INT32: case RVALUE_BOOL: val = (double) args[0].int32; break;
-        case RVALUE_INT64: val = (double) args[0].int64; break;
-        default: break;
-    }
+    double val = RValue_toReal(args[0]);
     return (RValue){ .real = floor(val), .type = RVALUE_REAL };
 }
 
 static RValue builtinCeil(VMContext* ctx, RValue* args, int32_t argCount) {
     (void) ctx;
     if (1 > argCount) return (RValue){ .real = 0.0, .type = RVALUE_REAL };
-    double val = 0.0;
-    switch (args[0].type) {
-        case RVALUE_REAL: val = args[0].real; break;
-        case RVALUE_INT32: case RVALUE_BOOL: val = (double) args[0].int32; break;
-        case RVALUE_INT64: val = (double) args[0].int64; break;
-        default: break;
-    }
+    double val = RValue_toReal(args[0]);
     return (RValue){ .real = ceil(val), .type = RVALUE_REAL };
 }
 
 static RValue builtinRound(VMContext* ctx, RValue* args, int32_t argCount) {
     (void) ctx;
     if (1 > argCount) return (RValue){ .real = 0.0, .type = RVALUE_REAL };
-    double val = 0.0;
-    switch (args[0].type) {
-        case RVALUE_REAL: val = args[0].real; break;
-        case RVALUE_INT32: case RVALUE_BOOL: val = (double) args[0].int32; break;
-        case RVALUE_INT64: val = (double) args[0].int64; break;
-        default: break;
-    }
+    double val = RValue_toReal(args[0]);
     return (RValue){ .real = round(val), .type = RVALUE_REAL };
 }
 
 static RValue builtinAbs(VMContext* ctx, RValue* args, int32_t argCount) {
     (void) ctx;
     if (1 > argCount) return (RValue){ .real = 0.0, .type = RVALUE_REAL };
-    double val = 0.0;
-    switch (args[0].type) {
-        case RVALUE_REAL: val = args[0].real; break;
-        case RVALUE_INT32: case RVALUE_BOOL: val = (double) args[0].int32; break;
-        case RVALUE_INT64: val = (double) args[0].int64; break;
-        default: break;
-    }
+    double val = RValue_toReal(args[0]);
     return (RValue){ .real = fabs(val), .type = RVALUE_REAL };
 }
 
 static RValue builtinSign(VMContext* ctx, RValue* args, int32_t argCount) {
     (void) ctx;
     if (1 > argCount) return (RValue){ .real = 0.0, .type = RVALUE_REAL };
-    double val = 0.0;
-    switch (args[0].type) {
-        case RVALUE_REAL: val = args[0].real; break;
-        case RVALUE_INT32: case RVALUE_BOOL: val = (double) args[0].int32; break;
-        case RVALUE_INT64: val = (double) args[0].int64; break;
-        default: break;
-    }
+    double val = RValue_toReal(args[0]);
     double result = (val > 0.0) ? 1.0 : ((0.0 > val) ? -1.0 : 0.0);
     return (RValue){ .real = result, .type = RVALUE_REAL };
 }
@@ -187,13 +139,7 @@ static RValue builtinMax(VMContext* ctx, RValue* args, int32_t argCount) {
     if (1 > argCount) return (RValue){ .real = 0.0, .type = RVALUE_REAL };
     double result = -INFINITY;
     repeat(argCount, i) {
-        double val = 0.0;
-        switch (args[i].type) {
-            case RVALUE_REAL: val = args[i].real; break;
-            case RVALUE_INT32: case RVALUE_BOOL: val = (double) args[i].int32; break;
-            case RVALUE_INT64: val = (double) args[i].int64; break;
-            default: break;
-        }
+        double val = RValue_toReal(args[i]);
         if (val > result) result = val;
     }
     return (RValue){ .real = result, .type = RVALUE_REAL };
@@ -204,13 +150,7 @@ static RValue builtinMin(VMContext* ctx, RValue* args, int32_t argCount) {
     if (1 > argCount) return (RValue){ .real = 0.0, .type = RVALUE_REAL };
     double result = INFINITY;
     repeat(argCount, i) {
-        double val = 0.0;
-        switch (args[i].type) {
-            case RVALUE_REAL: val = args[i].real; break;
-            case RVALUE_INT32: case RVALUE_BOOL: val = (double) args[i].int32; break;
-            case RVALUE_INT64: val = (double) args[i].int64; break;
-            default: break;
-        }
+        double val = RValue_toReal(args[i]);
         if (result > val) result = val;
     }
     return (RValue){ .real = result, .type = RVALUE_REAL };
@@ -219,32 +159,15 @@ static RValue builtinMin(VMContext* ctx, RValue* args, int32_t argCount) {
 static RValue builtinPower(VMContext* ctx, RValue* args, int32_t argCount) {
     (void) ctx;
     if (2 > argCount) return (RValue){ .real = 0.0, .type = RVALUE_REAL };
-    double base = 0.0, exp = 0.0;
-    switch (args[0].type) {
-        case RVALUE_REAL: base = args[0].real; break;
-        case RVALUE_INT32: case RVALUE_BOOL: base = (double) args[0].int32; break;
-        case RVALUE_INT64: base = (double) args[0].int64; break;
-        default: break;
-    }
-    switch (args[1].type) {
-        case RVALUE_REAL: exp = args[1].real; break;
-        case RVALUE_INT32: case RVALUE_BOOL: exp = (double) args[1].int32; break;
-        case RVALUE_INT64: exp = (double) args[1].int64; break;
-        default: break;
-    }
+    double base = RValue_toReal(args[0]);
+    double exp = RValue_toReal(args[1]);
     return (RValue){ .real = pow(base, exp), .type = RVALUE_REAL };
 }
 
 static RValue builtinSqrt(VMContext* ctx, RValue* args, int32_t argCount) {
     (void) ctx;
     if (1 > argCount) return (RValue){ .real = 0.0, .type = RVALUE_REAL };
-    double val = 0.0;
-    switch (args[0].type) {
-        case RVALUE_REAL: val = args[0].real; break;
-        case RVALUE_INT32: case RVALUE_BOOL: val = (double) args[0].int32; break;
-        case RVALUE_INT64: val = (double) args[0].int64; break;
-        default: break;
-    }
+    double val = RValue_toReal(args[0]);
     return (RValue){ .real = sqrt(val), .type = RVALUE_REAL };
 }
 
@@ -274,7 +197,7 @@ static RValue builtinIsUndefined(VMContext* ctx, RValue* args, int32_t argCount)
 void VMBuiltins_registerAll(void) {
     requireMessage(!initialized, "Attempting to register all VMBuiltins, but it was already registered!");
     initialized = true;
-    
+
     registerBuiltin("show_debug_message", builtinShowDebugMessage);
     registerBuiltin("string_length", builtinStringLength);
     registerBuiltin("real", builtinReal);

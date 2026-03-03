@@ -4,6 +4,7 @@
 #include <stddef.h>
 
 #include "data_win.h"
+#include "rvalue.h"
 
 // ===[ GML Data Types (4-bit type codes) ]===
 #define GML_TYPE_DOUBLE   0x0
@@ -70,27 +71,6 @@
 #define OP_PUSHBLTN 0xC3
 #define OP_CALL     0xD9
 #define OP_BREAK    0xFF
-
-// ===[ RValue - Tagged Union ]===
-typedef enum {
-    RVALUE_REAL = 0,
-    RVALUE_STRING = 1,
-    RVALUE_INT32 = 2,
-    RVALUE_INT64 = 3,
-    RVALUE_BOOL = 4,
-    RVALUE_UNDEFINED = 5,
-} RValueType;
-
-typedef struct {
-    union {
-        double real;
-        int32_t int32;
-        int64_t int64;
-        const char* string;
-    };
-    RValueType type;
-    bool ownsString;
-} RValue;
 
 // ===[ CallFrame - Saved state for script-to-script calls ]===
 typedef struct CallFrame {

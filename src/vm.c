@@ -9,112 +9,6 @@
 
 #include "stb_ds.h"
 
-// ===[ RValue Helpers ]===
-
-static RValue makeReal(double val) {
-    return (RValue){ .real = val, .type = RVALUE_REAL };
-}
-
-static RValue makeInt32(int32_t val) {
-    return (RValue){ .int32 = val, .type = RVALUE_INT32 };
-}
-
-static RValue makeInt64(int64_t val) {
-    return (RValue){ .int64 = val, .type = RVALUE_INT64 };
-}
-
-static RValue makeBool(bool val) {
-    return (RValue){ .int32 = val ? 1 : 0, .type = RVALUE_BOOL };
-}
-
-static RValue makeString(const char* val) {
-    return (RValue){ .string = val, .type = RVALUE_STRING, .ownsString = false };
-}
-
-static RValue makeOwnedString(char* val) {
-    return (RValue){ .string = val, .type = RVALUE_STRING, .ownsString = true };
-}
-
-static RValue makeUndefined(void) {
-    return (RValue){ .type = RVALUE_UNDEFINED };
-}
-
-static double toReal(RValue val) {
-    switch (val.type) {
-        case RVALUE_REAL:   return val.real;
-        case RVALUE_INT32:  return (double) val.int32;
-        case RVALUE_INT64:  return (double) val.int64;
-        case RVALUE_BOOL:   return (double) val.int32;
-        case RVALUE_STRING: return strtod(val.string, nullptr);
-        default:            return 0.0;
-    }
-}
-
-static int32_t toInt32(RValue val) {
-    switch (val.type) {
-        case RVALUE_REAL:   return (int32_t) val.real;
-        case RVALUE_INT32:  return val.int32;
-        case RVALUE_INT64:  return (int32_t) val.int64;
-        case RVALUE_BOOL:   return val.int32;
-        case RVALUE_STRING: return (int32_t) strtod(val.string, nullptr);
-        default:            return 0;
-    }
-}
-
-static int64_t toInt64(RValue val) {
-    switch (val.type) {
-        case RVALUE_REAL:   return (int64_t) val.real;
-        case RVALUE_INT32:  return (int64_t) val.int32;
-        case RVALUE_INT64:  return val.int64;
-        case RVALUE_BOOL:   return (int64_t) val.int32;
-        case RVALUE_STRING: return (int64_t) strtod(val.string, nullptr);
-        default:            return 0;
-    }
-}
-
-static bool toBool(RValue val) {
-    switch (val.type) {
-        case RVALUE_REAL:   return val.real > 0.5;
-        case RVALUE_INT32:  return val.int32 > 0;
-        case RVALUE_INT64:  return val.int64 > 0;
-        case RVALUE_BOOL:   return val.int32 != 0;
-        case RVALUE_STRING: return val.string != nullptr && val.string[0] != '\0';
-        default:            return false;
-    }
-}
-
-static void freeRValue(RValue* val) {
-    if (val->type == RVALUE_STRING && val->ownsString && val->string != nullptr) {
-        free((void*) val->string);
-        val->string = nullptr;
-        val->ownsString = false;
-    }
-}
-
-// Converts an RValue to a heap-allocated string representation.
-// The caller must free the returned string (unless it returns a literal pointer).
-static char* rvalueToString(RValue val) {
-    char buf[64];
-    switch (val.type) {
-        case RVALUE_REAL:
-            snprintf(buf, sizeof(buf), "%.16g", val.real);
-            return strdup(buf);
-        case RVALUE_INT32:
-            snprintf(buf, sizeof(buf), "%d", val.int32);
-            return strdup(buf);
-        case RVALUE_INT64:
-            snprintf(buf, sizeof(buf), "%lld", (long long) val.int64);
-            return strdup(buf);
-        case RVALUE_STRING:
-            return strdup(val.string != nullptr ? val.string : "");
-        case RVALUE_BOOL:
-            return strdup(val.int32 ? "1" : "0");
-        case RVALUE_UNDEFINED:
-            return strdup("undefined");
-    }
-    return strdup("");
-}
-
 // ===[ Stack Operations ]===
 
 static void stackPush(VMStack* stack, RValue val) {
@@ -289,7 +183,7 @@ static RValue resolveVariableRead(VMContext* ctx, int16_t instanceType, uint32_t
     uint8_t varType = (varRef >> 24) & 0xFF;
     if (varType == VARTYPE_ARRAY || varType == VARTYPE_STACKTOP) {
         fprintf(stderr, "VM: Array/StackTop variable access not yet implemented (variable '%s', varType=0x%02X)\n", varDef->name, varType);
-        return makeUndefined();
+        return RValue_makeUndefined();
     }
 
     switch (instanceType) {
@@ -304,7 +198,7 @@ static RValue resolveVariableRead(VMContext* ctx, int16_t instanceType, uint32_t
             return ctx->selfVars[varDef->varID];
         default:
             fprintf(stderr, "VM: Unhandled instance type %d for variable read '%s'\n", instanceType, varDef->name);
-            return makeUndefined();
+            return RValue_makeUndefined();
     }
 }
 
@@ -341,18 +235,18 @@ static RValue* resolveVariableWrite(VMContext* ctx, int16_t instanceType, uint32
 static RValue convertValue(RValue val, uint8_t targetType) {
     switch (targetType) {
         case GML_TYPE_DOUBLE:
-            return makeReal(toReal(val));
+            return RValue_makeReal(RValue_toReal(val));
         case GML_TYPE_FLOAT:
-            return makeReal((double) (float) toReal(val));
+            return RValue_makeReal((double) (float) RValue_toReal(val));
         case GML_TYPE_INT32:
-            return makeInt32(toInt32(val));
+            return RValue_makeInt32(RValue_toInt32(val));
         case GML_TYPE_INT64:
-            return makeInt64(toInt64(val));
+            return RValue_makeInt64(RValue_toInt64(val));
         case GML_TYPE_BOOL:
-            return makeBool(toBool(val));
+            return RValue_makeBool(RValue_toBool(val));
         case GML_TYPE_STRING: {
-            char* str = rvalueToString(val);
-            return makeOwnedString(str);
+            char* str = RValue_toString(val);
+            return RValue_makeOwnedString(str);
         }
         case GML_TYPE_VARIABLE:
             // Variable type on stack is just an RValue passthrough
@@ -375,19 +269,19 @@ static void handlePush(VMContext* ctx, uint32_t instr, const uint8_t* extraData)
 
     switch (type1) {
         case GML_TYPE_DOUBLE:
-            stackPush(&ctx->stack, makeReal(readFloat64(extraData)));
+            stackPush(&ctx->stack, RValue_makeReal(readFloat64(extraData)));
             break;
         case GML_TYPE_FLOAT:
-            stackPush(&ctx->stack, makeReal((double) readFloat32(extraData)));
+            stackPush(&ctx->stack, RValue_makeReal((double) readFloat32(extraData)));
             break;
         case GML_TYPE_INT32:
-            stackPush(&ctx->stack, makeInt32(readInt32(extraData)));
+            stackPush(&ctx->stack, RValue_makeInt32(readInt32(extraData)));
             break;
         case GML_TYPE_INT64:
-            stackPush(&ctx->stack, makeInt64(readInt64(extraData)));
+            stackPush(&ctx->stack, RValue_makeInt64(readInt64(extraData)));
             break;
         case GML_TYPE_BOOL:
-            stackPush(&ctx->stack, makeBool(readInt32(extraData) != 0));
+            stackPush(&ctx->stack, RValue_makeBool(readInt32(extraData) != 0));
             break;
         case GML_TYPE_VARIABLE: {
             int16_t instanceType = instrInstanceType(instr);
@@ -399,12 +293,12 @@ static void handlePush(VMContext* ctx, uint32_t instr, const uint8_t* extraData)
         case GML_TYPE_STRING: {
             int32_t stringIndex = readInt32(extraData);
             require(stringIndex >= 0 && ctx->dataWin->strg.count > (uint32_t) stringIndex);
-            stackPush(&ctx->stack, makeString(ctx->dataWin->strg.strings[stringIndex]));
+            stackPush(&ctx->stack, RValue_makeString(ctx->dataWin->strg.strings[stringIndex]));
             break;
         }
         case GML_TYPE_INT16: {
             int16_t value = (int16_t) (instr & 0xFFFF);
-            stackPush(&ctx->stack, makeInt32((int32_t) value));
+            stackPush(&ctx->stack, RValue_makeInt32((int32_t) value));
             break;
         }
         default:
@@ -440,12 +334,12 @@ static void handlePushBltn(VMContext* ctx, uint32_t instr, const uint8_t* extraD
     require(ctx->dataWin->vari.variableCount > varIndex);
     Variable* varDef = &ctx->dataWin->vari.variables[varIndex];
     fprintf(stderr, "VM: PushBltn not implemented - built-in variable '%s' (varID=%d)\n", varDef->name, varDef->varID);
-    stackPush(&ctx->stack, makeReal(0.0));
+    stackPush(&ctx->stack, RValue_makeReal(0.0));
 }
 
 static void handlePushI(VMContext* ctx, uint32_t instr) {
     int16_t value = (int16_t) (instr & 0xFFFF);
-    stackPush(&ctx->stack, makeInt32((int32_t) value));
+    stackPush(&ctx->stack, RValue_makeInt32((int32_t) value));
 }
 
 static void handlePop(VMContext* ctx, uint32_t instr, const uint8_t* extraData) {
@@ -459,21 +353,21 @@ static void handlePop(VMContext* ctx, uint32_t instr, const uint8_t* extraData) 
     // Convert if source type differs from destination type
     if (type2 != type1 && type1 != GML_TYPE_VARIABLE) {
         RValue converted = convertValue(val, type1);
-        freeRValue(&val);
+        RValue_free(&val);
         val = converted;
     }
 
     RValue* dest = resolveVariableWrite(ctx, instanceType, varRef);
 
     // Free old value if it owns a string
-    freeRValue(dest);
+    RValue_free(dest);
 
     *dest = val;
 }
 
 static void handlePopz(VMContext* ctx) {
     RValue val = stackPop(&ctx->stack);
-    freeRValue(&val);
+    RValue_free(&val);
 }
 
 static void handleAdd(VMContext* ctx) {
@@ -489,13 +383,13 @@ static void handleAdd(VMContext* ctx) {
         char* result = malloc(lenA + lenB + 1);
         memcpy(result, sa, lenA);
         memcpy(result + lenA, sb, lenB + 1);
-        freeRValue(&a);
-        freeRValue(&b);
-        stackPush(&ctx->stack, makeOwnedString(result));
+        RValue_free(&a);
+        RValue_free(&b);
+        stackPush(&ctx->stack, RValue_makeOwnedString(result));
     } else if (a.type == RVALUE_STRING || b.type == RVALUE_STRING) {
         // String + Number: convert both to strings and concatenate (GMS behavior)
-        char* sa = rvalueToString(a);
-        char* sb = rvalueToString(b);
+        char* sa = RValue_toString(a);
+        char* sb = RValue_toString(b);
         size_t lenA = strlen(sa);
         size_t lenB = strlen(sb);
         char* result = malloc(lenA + lenB + 1);
@@ -503,24 +397,24 @@ static void handleAdd(VMContext* ctx) {
         memcpy(result + lenA, sb, lenB + 1);
         free(sa);
         free(sb);
-        freeRValue(&a);
-        freeRValue(&b);
-        stackPush(&ctx->stack, makeOwnedString(result));
+        RValue_free(&a);
+        RValue_free(&b);
+        stackPush(&ctx->stack, RValue_makeOwnedString(result));
     } else {
-        double result = toReal(a) + toReal(b);
-        freeRValue(&a);
-        freeRValue(&b);
-        stackPush(&ctx->stack, makeReal(result));
+        double result = RValue_toReal(a) + RValue_toReal(b);
+        RValue_free(&a);
+        RValue_free(&b);
+        stackPush(&ctx->stack, RValue_makeReal(result));
     }
 }
 
 static void handleSub(VMContext* ctx) {
     RValue b = stackPop(&ctx->stack);
     RValue a = stackPop(&ctx->stack);
-    double result = toReal(a) - toReal(b);
-    freeRValue(&a);
-    freeRValue(&b);
-    stackPush(&ctx->stack, makeReal(result));
+    double result = RValue_toReal(a) - RValue_toReal(b);
+    RValue_free(&a);
+    RValue_free(&b);
+    stackPush(&ctx->stack, RValue_makeReal(result));
 }
 
 static void handleMul(VMContext* ctx) {
@@ -529,130 +423,130 @@ static void handleMul(VMContext* ctx) {
 
     if (a.type == RVALUE_STRING) {
         // String * Number = string repetition
-        int count = toInt32(b);
+        int count = RValue_toInt32(b);
         const char* str = a.string != nullptr ? a.string : "";
         size_t len = strlen(str);
         if (count <= 0 || len == 0) {
-            freeRValue(&a);
-            freeRValue(&b);
-            stackPush(&ctx->stack, makeOwnedString(strdup("")));
+            RValue_free(&a);
+            RValue_free(&b);
+            stackPush(&ctx->stack, RValue_makeOwnedString(strdup("")));
         } else {
             char* result = malloc(len * count + 1);
             repeat(count, i) {
                 memcpy(result + i * len, str, len);
             }
             result[len * count] = '\0';
-            freeRValue(&a);
-            freeRValue(&b);
-            stackPush(&ctx->stack, makeOwnedString(result));
+            RValue_free(&a);
+            RValue_free(&b);
+            stackPush(&ctx->stack, RValue_makeOwnedString(result));
         }
     } else {
-        double result = toReal(a) * toReal(b);
-        freeRValue(&a);
-        freeRValue(&b);
-        stackPush(&ctx->stack, makeReal(result));
+        double result = RValue_toReal(a) * RValue_toReal(b);
+        RValue_free(&a);
+        RValue_free(&b);
+        stackPush(&ctx->stack, RValue_makeReal(result));
     }
 }
 
 static void handleDiv(VMContext* ctx) {
     RValue b = stackPop(&ctx->stack);
     RValue a = stackPop(&ctx->stack);
-    double divisor = toReal(b);
+    double divisor = RValue_toReal(b);
     if (divisor == 0.0) {
         fprintf(stderr, "VM: DoDiv :: Divide by zero\n");
         abort();
     }
-    double result = toReal(a) / divisor;
-    freeRValue(&a);
-    freeRValue(&b);
-    stackPush(&ctx->stack, makeReal(result));
+    double result = RValue_toReal(a) / divisor;
+    RValue_free(&a);
+    RValue_free(&b);
+    stackPush(&ctx->stack, RValue_makeReal(result));
 }
 
 static void handleRem(VMContext* ctx) {
     RValue b = stackPop(&ctx->stack);
     RValue a = stackPop(&ctx->stack);
-    int32_t ib = toInt32(b);
+    int32_t ib = RValue_toInt32(b);
     if (ib == 0) {
         fprintf(stderr, "VM: DoRem :: Divide by zero\n");
         abort();
     }
-    int32_t result = toInt32(a) % ib;
-    freeRValue(&a);
-    freeRValue(&b);
-    stackPush(&ctx->stack, makeInt32(result));
+    int32_t result = RValue_toInt32(a) % ib;
+    RValue_free(&a);
+    RValue_free(&b);
+    stackPush(&ctx->stack, RValue_makeInt32(result));
 }
 
 static void handleMod(VMContext* ctx) {
     RValue b = stackPop(&ctx->stack);
     RValue a = stackPop(&ctx->stack);
-    double divisor = toReal(b);
+    double divisor = RValue_toReal(b);
     if (divisor == 0.0) {
         fprintf(stderr, "VM: DoMod :: Divide by zero\n");
         abort();
     }
-    double result = fmod(toReal(a), divisor);
-    freeRValue(&a);
-    freeRValue(&b);
-    stackPush(&ctx->stack, makeReal(result));
+    double result = fmod(RValue_toReal(a), divisor);
+    RValue_free(&a);
+    RValue_free(&b);
+    stackPush(&ctx->stack, RValue_makeReal(result));
 }
 
 static void handleAnd(VMContext* ctx) {
     RValue b = stackPop(&ctx->stack);
     RValue a = stackPop(&ctx->stack);
-    int32_t result = toInt32(a) & toInt32(b);
-    freeRValue(&a);
-    freeRValue(&b);
-    stackPush(&ctx->stack, makeInt32(result));
+    int32_t result = RValue_toInt32(a) & RValue_toInt32(b);
+    RValue_free(&a);
+    RValue_free(&b);
+    stackPush(&ctx->stack, RValue_makeInt32(result));
 }
 
 static void handleOr(VMContext* ctx) {
     RValue b = stackPop(&ctx->stack);
     RValue a = stackPop(&ctx->stack);
-    int32_t result = toInt32(a) | toInt32(b);
-    freeRValue(&a);
-    freeRValue(&b);
-    stackPush(&ctx->stack, makeInt32(result));
+    int32_t result = RValue_toInt32(a) | RValue_toInt32(b);
+    RValue_free(&a);
+    RValue_free(&b);
+    stackPush(&ctx->stack, RValue_makeInt32(result));
 }
 
 static void handleXor(VMContext* ctx) {
     RValue b = stackPop(&ctx->stack);
     RValue a = stackPop(&ctx->stack);
-    int32_t result = toInt32(a) ^ toInt32(b);
-    freeRValue(&a);
-    freeRValue(&b);
-    stackPush(&ctx->stack, makeInt32(result));
+    int32_t result = RValue_toInt32(a) ^ RValue_toInt32(b);
+    RValue_free(&a);
+    RValue_free(&b);
+    stackPush(&ctx->stack, RValue_makeInt32(result));
 }
 
 static void handleNeg(VMContext* ctx) {
     RValue a = stackPop(&ctx->stack);
-    double result = -toReal(a);
-    freeRValue(&a);
-    stackPush(&ctx->stack, makeReal(result));
+    double result = -RValue_toReal(a);
+    RValue_free(&a);
+    stackPush(&ctx->stack, RValue_makeReal(result));
 }
 
 static void handleNot(VMContext* ctx) {
     RValue a = stackPop(&ctx->stack);
-    int32_t result = ~toInt32(a);
-    freeRValue(&a);
-    stackPush(&ctx->stack, makeInt32(result));
+    int32_t result = ~RValue_toInt32(a);
+    RValue_free(&a);
+    stackPush(&ctx->stack, RValue_makeInt32(result));
 }
 
 static void handleShl(VMContext* ctx) {
     RValue b = stackPop(&ctx->stack);
     RValue a = stackPop(&ctx->stack);
-    int32_t result = toInt32(a) << toInt32(b);
-    freeRValue(&a);
-    freeRValue(&b);
-    stackPush(&ctx->stack, makeInt32(result));
+    int32_t result = RValue_toInt32(a) << RValue_toInt32(b);
+    RValue_free(&a);
+    RValue_free(&b);
+    stackPush(&ctx->stack, RValue_makeInt32(result));
 }
 
 static void handleShr(VMContext* ctx) {
     RValue b = stackPop(&ctx->stack);
     RValue a = stackPop(&ctx->stack);
-    int32_t result = toInt32(a) >> toInt32(b);
-    freeRValue(&a);
-    freeRValue(&b);
-    stackPush(&ctx->stack, makeInt32(result));
+    int32_t result = RValue_toInt32(a) >> RValue_toInt32(b);
+    RValue_free(&a);
+    RValue_free(&b);
+    stackPush(&ctx->stack, RValue_makeInt32(result));
 }
 
 static void handleConv(VMContext* ctx, uint32_t instr) {
@@ -671,51 +565,51 @@ static void handleConv(VMContext* ctx, uint32_t instr) {
             break;
 
         // Double (0) -> other
-        case 0x20: result = makeInt32((int32_t) val.real); break;
-        case 0x30: result = makeInt64((int64_t) val.real); break;
-        case 0x40: result = makeBool(val.real > 0.5); break;
-        case 0x60: { char* s = rvalueToString(val); result = makeOwnedString(s); break; }
-        case 0xF0: result = makeInt32((int32_t) val.real); break;
+        case 0x20: result = RValue_makeInt32((int32_t) val.real); break;
+        case 0x30: result = RValue_makeInt64((int64_t) val.real); break;
+        case 0x40: result = RValue_makeBool(val.real > 0.5); break;
+        case 0x60: { char* s = RValue_toString(val); result = RValue_makeOwnedString(s); break; }
+        case 0xF0: result = RValue_makeInt32((int32_t) val.real); break;
 
         // Float (1) -> other (float stored as double in our RValue)
-        case 0x01: result = makeReal(val.real); break;
-        case 0x21: result = makeInt32((int32_t) val.real); break;
-        case 0x31: result = makeInt64((int64_t) val.real); break;
-        case 0x41: result = makeBool(val.real > 0.5); break;
+        case 0x01: result = RValue_makeReal(val.real); break;
+        case 0x21: result = RValue_makeInt32((int32_t) val.real); break;
+        case 0x31: result = RValue_makeInt64((int64_t) val.real); break;
+        case 0x41: result = RValue_makeBool(val.real > 0.5); break;
 
         // Int32 (2) -> other
-        case 0x02: result = makeReal((double) val.int32); break;
-        case 0x12: result = makeReal((double) val.int32); break;
-        case 0x32: result = makeInt64((int64_t) val.int32); break;
-        case 0x42: result = makeBool(val.int32 > 0); break;
-        case 0x62: { char* s = rvalueToString(val); result = makeOwnedString(s); break; }
+        case 0x02: result = RValue_makeReal((double) val.int32); break;
+        case 0x12: result = RValue_makeReal((double) val.int32); break;
+        case 0x32: result = RValue_makeInt64((int64_t) val.int32); break;
+        case 0x42: result = RValue_makeBool(val.int32 > 0); break;
+        case 0x62: { char* s = RValue_toString(val); result = RValue_makeOwnedString(s); break; }
         case 0xF2: result = val; break;
 
         // Int64 (3) -> other
-        case 0x03: result = makeReal((double) val.int64); break;
-        case 0x23: result = makeInt32((int32_t) val.int64); break;
-        case 0x43: result = makeBool(val.int64 > 0); break;
+        case 0x03: result = RValue_makeReal((double) val.int64); break;
+        case 0x23: result = RValue_makeInt32((int32_t) val.int64); break;
+        case 0x43: result = RValue_makeBool(val.int64 > 0); break;
 
         // Bool (4) -> other
-        case 0x04: result = makeReal((double) val.int32); break;
-        case 0x24: result = makeInt32(val.int32); break;
-        case 0x34: result = makeInt64((int64_t) val.int32); break;
-        case 0x64: { char* s = rvalueToString(val); result = makeOwnedString(s); break; }
+        case 0x04: result = RValue_makeReal((double) val.int32); break;
+        case 0x24: result = RValue_makeInt32(val.int32); break;
+        case 0x34: result = RValue_makeInt64((int64_t) val.int32); break;
+        case 0x64: { char* s = RValue_toString(val); result = RValue_makeOwnedString(s); break; }
 
         // Variable (5) -> other
-        case 0x05: result = makeReal(toReal(val)); break;
-        case 0x15: result = makeReal(toReal(val)); break;
-        case 0x25: result = makeInt32(toInt32(val)); break;
-        case 0x35: result = makeInt64(toInt64(val)); break;
-        case 0x45: result = makeBool(toBool(val)); break;
-        case 0x65: { char* s = rvalueToString(val); result = makeOwnedString(s); break; }
-        case 0xF5: result = makeInt32(toInt32(val)); break;
+        case 0x05: result = RValue_makeReal(RValue_toReal(val)); break;
+        case 0x15: result = RValue_makeReal(RValue_toReal(val)); break;
+        case 0x25: result = RValue_makeInt32(RValue_toInt32(val)); break;
+        case 0x35: result = RValue_makeInt64(RValue_toInt64(val)); break;
+        case 0x45: result = RValue_makeBool(RValue_toBool(val)); break;
+        case 0x65: { char* s = RValue_toString(val); result = RValue_makeOwnedString(s); break; }
+        case 0xF5: result = RValue_makeInt32(RValue_toInt32(val)); break;
 
         // String (6) -> other
-        case 0x06: result = makeReal(strtod(val.string, nullptr)); break;
-        case 0x26: result = makeInt32((int32_t) strtod(val.string, nullptr)); break;
-        case 0x36: result = makeInt64((int64_t) strtod(val.string, nullptr)); break;
-        case 0x46: result = makeBool(val.string != nullptr && val.string[0] != '\0'); break;
+        case 0x06: result = RValue_makeReal(strtod(val.string, nullptr)); break;
+        case 0x26: result = RValue_makeInt32((int32_t) strtod(val.string, nullptr)); break;
+        case 0x36: result = RValue_makeInt64((int64_t) strtod(val.string, nullptr)); break;
+        case 0x46: result = RValue_makeBool(val.string != nullptr && val.string[0] != '\0'); break;
         case 0x56: {
             // String -> Variable: keep as-is since our RValue handles strings natively
             result = val;
@@ -723,7 +617,7 @@ static void handleConv(VMContext* ctx, uint32_t instr) {
         }
 
         // Int16 (F) -> other
-        case 0x0F: result = makeReal((double) val.int32); break;
+        case 0x0F: result = RValue_makeReal((double) val.int32); break;
         case 0x2F: result = val; break;
         case 0x5F: result = val; break;
 
@@ -735,7 +629,7 @@ static void handleConv(VMContext* ctx, uint32_t instr) {
 
     // Don't free the old value if we're returning the same value (identity conversion or passthrough)
     if (result.string != val.string || result.type != val.type) {
-        freeRValue(&val);
+        RValue_free(&val);
     }
 
     stackPush(&ctx->stack, result);
@@ -759,8 +653,8 @@ static void handleCmp(VMContext* ctx, uint32_t instr) {
             default: result = false; break;
         }
     } else {
-        double da = toReal(a);
-        double db = toReal(b);
+        double da = RValue_toReal(a);
+        double db = RValue_toReal(b);
         switch (cmpKind) {
             case CMP_LT:  result = da < db; break;
             case CMP_LTE: result = da <= db; break;
@@ -772,9 +666,9 @@ static void handleCmp(VMContext* ctx, uint32_t instr) {
         }
     }
 
-    freeRValue(&a);
-    freeRValue(&b);
-    stackPush(&ctx->stack, makeBool(result));
+    RValue_free(&a);
+    RValue_free(&b);
+    stackPush(&ctx->stack, RValue_makeBool(result));
 }
 
 static void handleDup(VMContext* ctx, uint32_t instr) {
@@ -797,8 +691,8 @@ static void handleBranch(VMContext* ctx, uint32_t instr, uint32_t instrAddr) {
 
 static void handleBranchTrue(VMContext* ctx, uint32_t instr, uint32_t instrAddr) {
     RValue val = stackPop(&ctx->stack);
-    bool condition = toBool(val);
-    freeRValue(&val);
+    bool condition = RValue_toBool(val);
+    RValue_free(&val);
     if (condition) {
         int32_t offset = instrJumpOffset(instr);
         ctx->ip = instrAddr + offset;
@@ -807,8 +701,8 @@ static void handleBranchTrue(VMContext* ctx, uint32_t instr, uint32_t instrAddr)
 
 static void handleBranchFalse(VMContext* ctx, uint32_t instr, uint32_t instrAddr) {
     RValue val = stackPop(&ctx->stack);
-    bool condition = toBool(val);
-    freeRValue(&val);
+    bool condition = RValue_toBool(val);
+    RValue_free(&val);
     if (!condition) {
         int32_t offset = instrJumpOffset(instr);
         ctx->ip = instrAddr + offset;
@@ -840,7 +734,7 @@ static void handleCall(VMContext* ctx, uint32_t instr, const uint8_t* extraData)
         // Free arguments
         if (args != nullptr) {
             repeat(argCount, i) {
-                freeRValue(&args[i]);
+                RValue_free(&args[i]);
             }
             free(args);
         }
@@ -867,11 +761,11 @@ static void handleCall(VMContext* ctx, uint32_t instr, const uint8_t* extraData)
         // Free arguments and push undefined
         if (args != nullptr) {
             repeat(argCount, i) {
-                freeRValue(&args[i]);
+                RValue_free(&args[i]);
             }
             free(args);
         }
-        stackPush(&ctx->stack, makeUndefined());
+        stackPush(&ctx->stack, RValue_makeUndefined());
         return;
     }
 
@@ -951,7 +845,7 @@ static void handleCall(VMContext* ctx, uint32_t instr, const uint8_t* extraData)
     // Free the args array (values were moved into locals)
     if (args != nullptr) {
         repeat(argCount, i) {
-            freeRValue(&args[i]);
+            RValue_free(&args[i]);
         }
         free(args);
     }
@@ -967,7 +861,7 @@ static void handleCall(VMContext* ctx, uint32_t instr, const uint8_t* extraData)
 
     // Free callee locals
     repeat(ctx->localVarCount, i) {
-        freeRValue(&ctx->localVars[i]);
+        RValue_free(&ctx->localVars[i]);
     }
     free(ctx->localVars);
 
@@ -1084,7 +978,7 @@ static RValue executeLoop(VMContext* ctx) {
 
             // Exit (no return value)
             case OP_EXIT:
-                return makeUndefined();
+                return RValue_makeUndefined();
 
             // Environment (with-statements) - stubbed
             case OP_PUSHENV:
@@ -1104,7 +998,7 @@ static RValue executeLoop(VMContext* ctx) {
         }
     }
 
-    return makeUndefined();
+    return RValue_makeUndefined();
 }
 
 // ===[ Public API ]===
@@ -1204,7 +1098,7 @@ RValue VM_executeCode(VMContext* ctx, int32_t codeIndex) {
 
     // Free locals
     repeat(ctx->localVarCount, i) {
-        freeRValue(&ctx->localVars[i]);
+        RValue_free(&ctx->localVars[i]);
     }
     free(ctx->localVars);
     ctx->localVars = nullptr;
@@ -1219,7 +1113,7 @@ void VM_free(VMContext* ctx) {
     // Free global vars
     if (ctx->globalVars != nullptr) {
         repeat(ctx->globalVarCount, i) {
-            freeRValue(&ctx->globalVars[i]);
+            RValue_free(&ctx->globalVars[i]);
         }
         free(ctx->globalVars);
     }
@@ -1227,7 +1121,7 @@ void VM_free(VMContext* ctx) {
     // Free self vars
     if (ctx->selfVars != nullptr) {
         repeat(ctx->selfVarCount, i) {
-            freeRValue(&ctx->selfVars[i]);
+            RValue_free(&ctx->selfVars[i]);
         }
         free(ctx->selfVars);
     }

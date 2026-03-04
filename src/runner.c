@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #include "stb_ds.h"
 
@@ -784,6 +785,38 @@ void Runner_step(Runner* runner) {
 
     // Execute Normal Step for all instances
     Runner_executeEventForAll(runner, EVENT_STEP, STEP_NORMAL);
+
+    // Apply motion: friction, gravity, then x += hspeed, y += vspeed
+    int32_t motionCount = (int32_t) arrlen(runner->instances);
+    repeat(motionCount, mi) {
+        Instance* inst = runner->instances[mi];
+        if (!inst->active) continue;
+
+        // Friction: reduce speed toward zero (HTML5: AdaptSpeed)
+        if (inst->friction != 0.0) {
+            double ns = (inst->speed > 0.0) ? inst->speed - inst->friction : inst->speed + inst->friction;
+            if ((inst->speed > 0.0 && ns < 0.0) || (inst->speed < 0.0 && ns > 0.0)) {
+                inst->speed = 0.0;
+            } else if (inst->speed != 0.0) {
+                inst->speed = ns;
+            }
+            Instance_computeComponentsFromSpeed(inst);
+        }
+
+        // Gravity: add velocity in gravity_direction (HTML5: AddTo_Speed)
+        if (inst->gravity != 0.0) {
+            double gravDirRad = inst->gravityDirection * (M_PI / 180.0);
+            inst->hspeed += inst->gravity * clampFloat(cos(gravDirRad));
+            inst->vspeed -= inst->gravity * clampFloat(sin(gravDirRad));
+            Instance_computeSpeedFromComponents(inst);
+        }
+
+        // Apply movement
+        if (inst->hspeed != 0.0 || inst->vspeed != 0.0) {
+            inst->x += inst->hspeed;
+            inst->y += inst->vspeed;
+        }
+    }
 
     // Dispatch collision events
     dispatchCollisionEvents(runner);

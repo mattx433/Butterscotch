@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #include "stb_ds.h"
 #include "utils.h"
@@ -28,6 +29,13 @@ Instance* Instance_create(uint32_t instanceId, int32_t objectIndex, double x, do
     inst->imageAlpha = 1.0;
     inst->imageBlend = 0xFFFFFF;
     inst->depth = 0;
+    inst->speed = 0.0;
+    inst->direction = 0.0;
+    inst->hspeed = 0.0;
+    inst->vspeed = 0.0;
+    inst->friction = 0.0;
+    inst->gravity = 0.0;
+    inst->gravityDirection = 270.0;
     inst->selfArrayMap = nullptr;
     inst->selfArrayVarTracker = nullptr;
 
@@ -71,4 +79,50 @@ void Instance_free(Instance* instance) {
     hmfree(instance->selfArrayVarTracker);
 
     free(instance);
+}
+
+// Compute speed and direction from hspeed/vspeed (HTML5: Compute_Speed1)
+void Instance_computeSpeedFromComponents(Instance* inst) {
+    // Direction
+    if (inst->hspeed == 0.0) {
+        if (inst->vspeed > 0.0) {
+            inst->direction = 270.0;
+        } else if (inst->vspeed < 0.0) {
+            inst->direction = 90.0;
+        }
+        // If both are 0, direction stays unchanged
+    } else {
+        double dd = clampFloat(180.0 * atan2(inst->vspeed, inst->hspeed) / M_PI);
+        if (dd <= 0.0) {
+            inst->direction = -dd;
+        } else {
+            inst->direction = 360.0 - dd;
+        }
+    }
+
+    // Round direction if very close to integer
+    if (fabs(inst->direction - round(inst->direction)) < 0.0001) {
+        inst->direction = round(inst->direction);
+    }
+    inst->direction = fmod(inst->direction, 360.0);
+
+    // Speed
+    inst->speed = sqrt(inst->hspeed * inst->hspeed + inst->vspeed * inst->vspeed);
+    if (fabs(inst->speed - round(inst->speed)) < 0.0001) {
+        inst->speed = round(inst->speed);
+    }
+}
+
+// Compute hspeed/vspeed from speed and direction (HTML5: Compute_Speed2)
+void Instance_computeComponentsFromSpeed(Instance* inst) {
+    inst->hspeed = inst->speed * clampFloat(cos(inst->direction * (M_PI / 180.0)));
+    inst->vspeed = -inst->speed * clampFloat(sin(inst->direction * (M_PI / 180.0)));
+
+    // Round if very close to integer
+    if (fabs(inst->hspeed - round(inst->hspeed)) < 0.0001) {
+        inst->hspeed = round(inst->hspeed);
+    }
+    if (fabs(inst->vspeed - round(inst->vspeed)) < 0.0001) {
+        inst->vspeed = round(inst->vspeed);
+    }
 }

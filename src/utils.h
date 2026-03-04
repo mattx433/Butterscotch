@@ -40,6 +40,11 @@ abort(); \
 _val; \
 })
 
+// Truncates to 6 decimal places, matching the HTML5 runner's ClampFloat
+static inline double clampFloat(double f) {
+    return ((double) ((int64_t) (f * 1000000.0))) / 1000000.0;
+}
+
 #define BGR_B(c) (((c) >> 16) & 0xFF)
 #define BGR_G(c) (((c) >>  8) & 0xFF)
 #define BGR_R(c) (((c) >>  0) & 0xFF)

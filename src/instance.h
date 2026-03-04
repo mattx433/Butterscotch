@@ -25,8 +25,20 @@ typedef struct Instance {
     double imageXscale, imageYscale, imageAngle, imageAlpha;
     uint32_t imageBlend;
     int32_t depth;
+
+    // Motion properties
+    double speed, direction;
+    double hspeed, vspeed;
+    double friction;
+    double gravity, gravityDirection;
+
     int32_t alarm[GML_ALARM_COUNT];
 } Instance;
 
 Instance* Instance_create(uint32_t instanceId, int32_t objectIndex, double x, double y, uint32_t selfVarCount);
 void Instance_free(Instance* instance);
+
+// Recompute speed/direction from hspeed/vspeed (called when hspeed or vspeed is set)
+void Instance_computeSpeedFromComponents(Instance* inst);
+// Recompute hspeed/vspeed from speed/direction (called when speed or direction is set)
+void Instance_computeComponentsFromSpeed(Instance* inst);

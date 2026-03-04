@@ -158,6 +158,13 @@ RValue VMBuiltins_getVariable(VMContext* ctx, const char* name, int32_t arrayInd
         if (strcmp(name, "object_index") == 0) return RValue_makeReal((double) inst->objectIndex);
         if (strcmp(name, "persistent") == 0) return RValue_makeBool(inst->persistent);
         if (strcmp(name, "solid") == 0) return RValue_makeBool(inst->solid);
+        if (strcmp(name, "speed") == 0) return RValue_makeReal(inst->speed);
+        if (strcmp(name, "direction") == 0) return RValue_makeReal(inst->direction);
+        if (strcmp(name, "hspeed") == 0) return RValue_makeReal(inst->hspeed);
+        if (strcmp(name, "vspeed") == 0) return RValue_makeReal(inst->vspeed);
+        if (strcmp(name, "friction") == 0) return RValue_makeReal(inst->friction);
+        if (strcmp(name, "gravity") == 0) return RValue_makeReal(inst->gravity);
+        if (strcmp(name, "gravity_direction") == 0) return RValue_makeReal(inst->gravityDirection);
         if (strcmp(name, "alarm") == 0) {
             if (isValidAlarmIndex(arrayIndex)) {
                 return RValue_makeReal((double) inst->alarm[arrayIndex]);
@@ -316,6 +323,19 @@ void VMBuiltins_setVariable(VMContext* ctx, const char* name, RValue val, int32_
         if (strcmp(name, "xprevious") == 0) { inst->xprevious = RValue_toReal(val); return; }
         if (strcmp(name, "yprevious") == 0) { inst->yprevious = RValue_toReal(val); return; }
         if (strcmp(name, "mask_index") == 0) { inst->maskIndex = RValue_toInt32(val); return; }
+        if (strcmp(name, "speed") == 0) { inst->speed = RValue_toReal(val); Instance_computeComponentsFromSpeed(inst); return; }
+        if (strcmp(name, "direction") == 0) {
+            double d = fmod(RValue_toReal(val), 360.0);
+            if (d < 0.0) d += 360.0;
+            inst->direction = d;
+            Instance_computeComponentsFromSpeed(inst);
+            return;
+        }
+        if (strcmp(name, "hspeed") == 0) { inst->hspeed = RValue_toReal(val); Instance_computeSpeedFromComponents(inst); return; }
+        if (strcmp(name, "vspeed") == 0) { inst->vspeed = RValue_toReal(val); Instance_computeSpeedFromComponents(inst); return; }
+        if (strcmp(name, "friction") == 0) { inst->friction = RValue_toReal(val); return; }
+        if (strcmp(name, "gravity") == 0) { inst->gravity = RValue_toReal(val); return; }
+        if (strcmp(name, "gravity_direction") == 0) { inst->gravityDirection = RValue_toReal(val); return; }
         if (strcmp(name, "alarm") == 0) {
             if (isValidAlarmIndex(arrayIndex)) {
                 int32_t newValue = RValue_toInt32(val);

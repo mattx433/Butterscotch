@@ -114,6 +114,29 @@ void Runner_executeEventForAll(Runner* runner, int32_t eventType, int32_t eventS
     }
 }
 
+// ===[ Instance Creation Helper ]===
+
+static Instance* createAndInitInstance(Runner* runner, int32_t instanceId, int32_t objectIndex, double x, double y) {
+    DataWin* dataWin = runner->dataWin;
+    require(objectIndex >= 0 && dataWin->objt.count > (uint32_t) objectIndex);
+
+    GameObject* objDef = &dataWin->objt.objects[objectIndex];
+    uint32_t selfVarCount = runner->vmContext->selfVarCount;
+
+    Instance* inst = Instance_create(instanceId, objectIndex, x, y, selfVarCount);
+
+    // Copy properties from object definition
+    inst->spriteIndex = objDef->spriteId;
+    inst->visible = objDef->visible;
+    inst->solid = objDef->solid;
+    inst->persistent = objDef->persistent;
+    inst->depth = objDef->depth;
+
+    arrput(runner->instances, inst);
+
+    return inst;
+}
+
 // ===[ Room Management ]===
 
 static void initRoom(Runner* runner, int32_t roomIndex) {
@@ -147,13 +170,9 @@ static void initRoom(Runner* runner, int32_t roomIndex) {
     arrfree(runner->instances);
     runner->instances = keptInstances;
 
-    // Get self var count from VM context
-    uint32_t selfVarCount = runner->vmContext->selfVarCount;
-
     // Create new instances from room definition
     repeat(room->gameObjectCount, i) {
         RoomGameObject* roomObj = &room->gameObjects[i];
-        require(roomObj->objectDefinition >= 0 && dataWin->objt.count > (uint32_t) roomObj->objectDefinition);
 
         // Check if a persistent instance with this ID already exists
         bool alreadyExists = false;
@@ -165,37 +184,13 @@ static void initRoom(Runner* runner, int32_t roomIndex) {
         }
         if (alreadyExists) continue;
 
-        GameObject* objDef = &dataWin->objt.objects[roomObj->objectDefinition];
-
-        Instance* inst = Instance_create(
-            roomObj->instanceID,
-            roomObj->objectDefinition,
-            (double) roomObj->x,
-            (double) roomObj->y,
-            selfVarCount
-        );
-
-        // Copy properties from object definition
-        inst->spriteIndex = objDef->spriteId;
-        inst->visible = objDef->visible;
-        inst->solid = objDef->solid;
-        inst->persistent = objDef->persistent;
-        inst->depth = objDef->depth;
-
-        // Copy properties from room game object
+        Instance* inst = createAndInitInstance(runner, roomObj->instanceID, roomObj->objectDefinition, (double) roomObj->x, (double) roomObj->y);
         inst->imageXscale = (double) roomObj->scaleX;
         inst->imageYscale = (double) roomObj->scaleY;
         inst->imageAngle = (double) roomObj->rotation;
 
-        arrput(runner->instances, inst);
-
-        // Run PreCreate code
         executeCode(runner, inst, roomObj->preCreateCode);
-
-        // Run Create event
         Runner_executeEvent(runner, inst, EVENT_CREATE, 0);
-
-        // Run instance creation code
         executeCode(runner, inst, roomObj->creationCode);
     }
 
@@ -230,24 +225,8 @@ Runner* Runner_create(DataWin* dataWin, VMContext* vm) {
 }
 
 Instance* Runner_createInstance(Runner* runner, double x, double y, int32_t objectIndex) {
-    DataWin* dataWin = runner->dataWin;
-    require(objectIndex >= 0 && dataWin->objt.count > (uint32_t) objectIndex);
-
-    GameObject* objDef = &dataWin->objt.objects[objectIndex];
-    uint32_t selfVarCount = runner->vmContext->selfVarCount;
-
-    Instance* inst = Instance_create(runner->nextInstanceId++, objectIndex, x, y, selfVarCount);
-
-    inst->spriteIndex = objDef->spriteId;
-    inst->visible = objDef->visible;
-    inst->solid = objDef->solid;
-    inst->persistent = objDef->persistent;
-    inst->depth = objDef->depth;
-
-    arrput(runner->instances, inst);
-
+    Instance* inst = createAndInitInstance(runner, runner->nextInstanceId++, objectIndex, x, y);
     Runner_executeEvent(runner, inst, EVENT_CREATE, 0);
-
     return inst;
 }
 

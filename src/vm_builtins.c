@@ -1461,6 +1461,53 @@ static RValue builtinActionSetRelative(VMContext* ctx, [[maybe_unused]] RValue* 
     return RValue_makeUndefined();
 }
 
+static RValue builtinActionMove(VMContext* ctx, [[maybe_unused]] RValue* args, [[maybe_unused]] int32_t argCount) {
+    // action_move(direction_string, speed)
+    // Direction string is 9 chars of '0'/'1' encoding a 3x3 direction grid:
+    //   Pos: 0=UL(225) 1=U(270) 2=UR(315) 3=L(180) 4=STOP 5=R(0) 6=DL(135) 7=D(90) 8=DR(45)
+    const char* dirs = RValue_toString(args[0]);
+    double spd = RValue_toReal(args[1]);
+
+    static const double angles[] = {225, 270, 315, 180, -1, 0, 135, 90, 45};
+
+    // Collect all enabled directions
+    int candidates[9];
+    int count = 0;
+    for (int i = 0; 9 > i && dirs[i] != '\0'; i++) {
+        if (dirs[i] == '1') {
+            candidates[count++] = i;
+        }
+    }
+
+    if (0 == count) return RValue_makeUndefined();
+
+    // Pick one at random
+    int pick = candidates[0 == count - 1 ? 0 : rand() % count];
+
+    if (ctx->currentInstance != nullptr) {
+        Instance* inst = (Instance*) ctx->currentInstance;
+        if (4 == pick) {
+            // STOP
+            if (ctx->actionRelativeFlag) {
+                inst->speed += spd;
+            } else {
+                inst->speed = 0;
+            }
+        } else {
+            double angle = angles[pick];
+            if (ctx->actionRelativeFlag) {
+                inst->direction += angle;
+                inst->speed += spd;
+            } else {
+                inst->direction = angle;
+                inst->speed = spd;
+            }
+        }
+        Instance_computeComponentsFromSpeed(inst);
+    }
+    return RValue_makeUndefined();
+}
+
 static RValue builtinActionMoveTo(VMContext* ctx, [[maybe_unused]] RValue* args, [[maybe_unused]] int32_t argCount) {
     double ax = RValue_toReal(args[0]);
     double ay = RValue_toReal(args[1]);
@@ -2297,6 +2344,7 @@ void VMBuiltins_registerAll(void) {
     registerBuiltin("instance_create", builtinInstanceCreate);
     registerBuiltin("action_kill_object", builtinActionKillObject);
     registerBuiltin("action_set_relative", builtinActionSetRelative);
+    registerBuiltin("action_move", builtinActionMove);
     registerBuiltin("action_move_to", builtinActionMoveTo);
     registerBuiltin("event_inherited", builtinEventInherited);
     registerBuiltin("event_user", builtinEventUser);

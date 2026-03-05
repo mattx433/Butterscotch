@@ -1579,6 +1579,28 @@ static RValue builtinActionKillObject(VMContext* ctx, [[maybe_unused]] RValue* a
     return RValue_makeUndefined();
 }
 
+static RValue builtinActionCreateObject(VMContext* ctx, RValue* args, int32_t argCount) {
+    if (3 > argCount) return RValue_makeUndefined();
+    Runner* runner = (Runner*) ctx->runner;
+    int32_t objectIndex = RValue_toInt32(args[0]);
+    double x = RValue_toReal(args[1]);
+    double y = RValue_toReal(args[2]);
+    if (0 > objectIndex || runner->dataWin->objt.count <= (uint32_t) objectIndex) {
+        fprintf(stderr, "VM: action_create_object: objectIndex %d out of range\n", objectIndex);
+        return RValue_makeUndefined();
+    }
+    Instance* callerInst = (Instance*) ctx->currentInstance;
+    if (ctx->actionRelativeFlag && callerInst != nullptr) {
+        x += callerInst->x;
+        y += callerInst->y;
+    }
+    Instance* inst = Runner_createInstance(runner, x, y, objectIndex);
+    if (callerInst != nullptr && ctx->creatorVarID >= 0 && inst->selfVarCount > (uint32_t) ctx->creatorVarID) {
+        inst->selfVars[ctx->creatorVarID] = RValue_makeReal((double) callerInst->instanceId);
+    }
+    return RValue_makeUndefined();
+}
+
 static RValue builtinActionSetRelative(VMContext* ctx, [[maybe_unused]] RValue* args, [[maybe_unused]] int32_t argCount) {
     ctx->actionRelativeFlag = RValue_toInt32(args[0]) != 0;
     return RValue_makeUndefined();
@@ -2547,6 +2569,7 @@ void VMBuiltins_registerAll(void) {
     registerBuiltin("instance_destroy", builtinInstanceDestroy);
     registerBuiltin("instance_create", builtinInstanceCreate);
     registerBuiltin("action_kill_object", builtinActionKillObject);
+    registerBuiltin("action_create_object", builtinActionCreateObject);
     registerBuiltin("action_set_relative", builtinActionSetRelative);
     registerBuiltin("action_move", builtinActionMove);
     registerBuiltin("action_move_to", builtinActionMoveTo);

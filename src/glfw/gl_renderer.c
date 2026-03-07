@@ -1,6 +1,6 @@
 #include "gl_renderer.h"
-#include "../../matrix_math.h"
-#include "../../text_utils.h"
+#include "matrix_math.h"
+#include "text_utils.h"
 
 #include <glad/glad.h>
 #include <stdio.h>

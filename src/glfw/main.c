@@ -1,5 +1,5 @@
-#include "../../data_win.h"
-#include "../../vm.h"
+#include "data_win.h"
+#include "vm.h"
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -16,7 +16,7 @@
 #include "stb_ds.h"
 #include "stb_image_write.h"
 
-#include "../../utils.h"
+#include "utils.h"
 
 // ===[ COMMAND LINE ARGUMENTS ]===
 typedef struct {

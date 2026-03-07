@@ -13,7 +13,7 @@ endif()
 
 file(GLOB SOURCES src/*.c)
 # Platform specific files builds
-file(GLOB PLATFORM_SOURCES src/platforms/${PLATFORM}/*.c)
+file(GLOB PLATFORM_SOURCES src/${PLATFORM}/*.c)
 
 add_executable(butterscotch ${SOURCES} ${PLATFORM_SOURCES})
 target_include_directories(butterscotch PRIVATE ${CMAKE_SOURCE_DIR}/src)

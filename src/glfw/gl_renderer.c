@@ -909,6 +909,7 @@ static RendererVtable glVtable = {
     .flush = glRendererFlush,
     .createSpriteFromSurface = glCreateSpriteFromSurface,
     .deleteSprite = glDeleteSprite,
+    .drawTile = nullptr,
 };
 
 // ===[ Public API ]===

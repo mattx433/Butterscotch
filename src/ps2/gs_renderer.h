@@ -14,6 +14,22 @@ typedef struct {
     uint8_t bpp;        // 4 or 8
 } AtlasTPAGEntry;
 
+// ===[ Atlas Tile Entry (from ATLAS.BIN tile entries) ]===
+typedef struct {
+    int16_t bgDef;      // Background definition index
+    uint16_t srcX;      // Source X in the original background image
+    uint16_t srcY;      // Source Y in the original background image
+    uint16_t srcW;      // Original tile width in pixels
+    uint16_t srcH;      // Original tile height in pixels
+    uint16_t atlasId;   // TEX atlas index (0xFFFF = not mapped)
+    uint16_t atlasX;    // X offset within the atlas
+    uint16_t atlasY;    // Y offset within the atlas
+    uint16_t width;     // Tile width in the atlas (may differ from srcW if downscaled)
+    uint16_t height;    // Tile height in the atlas (may differ from srcH if downscaled)
+    uint16_t clutIndex; // CLUT index within the corresponding CLUT file
+    uint8_t bpp;        // 4 or 8
+} AtlasTileEntry;
+
 // ===[ VRAM Chunk (buddy system unit) ]===
 // Each chunk is 128KB of VRAM (fits one 4bpp 512x512 atlas).
 // An 8bpp atlas uses 2 consecutive chunks.
@@ -45,7 +61,7 @@ typedef struct {
     uint16_t atlasTPAGCount;
     uint16_t atlasTileCount;
     AtlasTPAGEntry* atlasTPAGEntries;
-    // Tile entries will be added later
+    AtlasTileEntry* atlasTileEntries;
 
     // CLUT VRAM addresses (one per CLUT, individually uploaded)
     uint32_t clut4Count;       // Number of 4bpp CLUTs

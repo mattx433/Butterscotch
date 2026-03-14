@@ -25,6 +25,8 @@ typedef struct {
     void (*flush)(Renderer* renderer);
     int32_t (*createSpriteFromSurface)(Renderer* renderer, int32_t x, int32_t y, int32_t w, int32_t h, bool removeback, bool smooth, int32_t xorig, int32_t yorig);
     void (*deleteSprite)(Renderer* renderer, int32_t spriteIndex);
+    // Optional: platform-specific tile rendering (nullptr = use default drawSpritePart path)
+    void (*drawTile)(Renderer* renderer, RoomTile* tile, float offsetX, float offsetY);
 } RendererVtable;
 
 // ===[ Renderer Base Struct ]===
@@ -225,6 +227,12 @@ static void Renderer_drawSelf(Renderer* renderer, Instance* instance) {
 
 // Draws a room tile with layer shift offset applied
 static void Renderer_drawTile(Renderer* renderer, RoomTile* tile, float offsetX, float offsetY) {
+    // If the platform has a dedicated tile renderer, use it (PS2 has separate tile atlas entries)
+    if (renderer->vtable->drawTile != nullptr) {
+        renderer->vtable->drawTile(renderer, tile, offsetX, offsetY);
+        return;
+    }
+
     int32_t tpagIndex = Renderer_resolveBackgroundTPAGIndex(renderer->dataWin, tile->backgroundDefinition);
     if (0 > tpagIndex) return;
 

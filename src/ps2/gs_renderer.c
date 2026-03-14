@@ -99,14 +99,37 @@ static void loadAtlas(GsRenderer* gs) {
         entry->bpp = BinaryReader_readUint8(&reader);
     }
 
-    // Tile entries skipped for now (will be added later)
+    // Parse tile entries
+    gs->atlasTileEntries = safeMalloc(gs->atlasTileCount * sizeof(AtlasTileEntry));
+
+    repeat(gs->atlasTileCount, i) {
+        AtlasTileEntry* entry = &gs->atlasTileEntries[i];
+        entry->bgDef = BinaryReader_readInt16(&reader);
+        entry->srcX = BinaryReader_readUint16(&reader);
+        entry->srcY = BinaryReader_readUint16(&reader);
+        entry->srcW = BinaryReader_readUint16(&reader);
+        entry->srcH = BinaryReader_readUint16(&reader);
+        entry->atlasId = BinaryReader_readUint16(&reader);
+        entry->atlasX = BinaryReader_readUint16(&reader);
+        entry->atlasY = BinaryReader_readUint16(&reader);
+        entry->width = BinaryReader_readUint16(&reader);
+        entry->height = BinaryReader_readUint16(&reader);
+        entry->clutIndex = BinaryReader_readUint16(&reader);
+        entry->bpp = BinaryReader_readUint8(&reader);
+    }
 
     fclose(f);
 
-    // Determine atlas count (find max atlasId) and build bpp table
+    // Determine atlas count (find max atlasId across both TPAG and tile entries)
     uint16_t maxAtlasId = 0;
     repeat(gs->atlasTPAGCount, i) {
         AtlasTPAGEntry* entry = &gs->atlasTPAGEntries[i];
+        if (entry->atlasId != 0xFFFF && entry->atlasId > maxAtlasId) {
+            maxAtlasId = entry->atlasId;
+        }
+    }
+    repeat(gs->atlasTileCount, i) {
+        AtlasTileEntry* entry = &gs->atlasTileEntries[i];
         if (entry->atlasId != 0xFFFF && entry->atlasId > maxAtlasId) {
             maxAtlasId = entry->atlasId;
         }
@@ -119,9 +142,15 @@ static void loadAtlas(GsRenderer* gs) {
         gs->atlasToChunk[i] = -1;
     }
 
-    // Build bpp table from TPAG entries
+    // Build bpp table from TPAG and tile entries
     repeat(gs->atlasTPAGCount, i) {
         AtlasTPAGEntry* entry = &gs->atlasTPAGEntries[i];
+        if (entry->atlasId != 0xFFFF && gs->atlasCount > entry->atlasId) {
+            gs->atlasBpp[entry->atlasId] = entry->bpp;
+        }
+    }
+    repeat(gs->atlasTileCount, i) {
+        AtlasTileEntry* entry = &gs->atlasTileEntries[i];
         if (entry->atlasId != 0xFFFF && gs->atlasCount > entry->atlasId) {
             gs->atlasBpp[entry->atlasId] = entry->bpp;
         }
@@ -499,6 +528,61 @@ static bool setupTextureForTPAG(GsRenderer* gs, GSTEXTURE* tex, int32_t tpagInde
     return true;
 }
 
+// ===[ Tile Lookup and Texture Setup ]===
+
+// Finds a tile entry by (bgDef, srcX, srcY, srcW, srcH). Returns nullptr if not found.
+static AtlasTileEntry* findTileEntry(GsRenderer* gs, int16_t bgDef, uint16_t srcX, uint16_t srcY, uint16_t srcW, uint16_t srcH) {
+    forEach(AtlasTileEntry, entry, gs->atlasTileEntries, gs->atlasTileCount) {
+        if (entry->bgDef == bgDef && entry->srcX == srcX && entry->srcY == srcY && entry->srcW == srcW && entry->srcH == srcH) {
+            return entry;
+        }
+    }
+    return nullptr;
+}
+
+// Configures a GSTEXTURE for rendering a tile entry. Same logic as setupTextureForTPAG but for AtlasTileEntry.
+static bool setupTextureForTile(GsRenderer* gs, GSTEXTURE* tex, AtlasTileEntry* entry) {
+    if (entry->atlasId == 0xFFFF) return false;
+
+    if (!ensureAtlasLoaded(gs, entry->atlasId))
+        return false;
+
+    int16_t chunkIdx = gs->atlasToChunk[entry->atlasId];
+    uint32_t vramAddr = gs->textureVramBase + (uint32_t) chunkIdx * VRAM_CHUNK_SIZE;
+
+    memset(tex, 0, sizeof(GSTEXTURE));
+    tex->Width = ATLAS_WIDTH;
+    tex->Height = ATLAS_HEIGHT;
+    tex->TBW = ATLAS_WIDTH / 64;
+    tex->Vram = vramAddr;
+    tex->Filter = GS_FILTER_NEAREST;
+    tex->ClutStorageMode = GS_CLUT_STORAGE_CSM1;
+
+    if (entry->bpp == 4) {
+        tex->PSM = GS_PSM_T4;
+        tex->ClutPSM = GS_PSM_CT32;
+
+        if (entry->clutIndex >= gs->clut4Count) {
+            fprintf(stderr, "GsRenderer: CLUT4 index %u out of range (max %u) for tile (bg=%d)\n", entry->clutIndex, gs->clut4Count - 1, entry->bgDef);
+            abort();
+        }
+
+        tex->VramClut = gs->clut4VramAddrs[entry->clutIndex];
+    } else {
+        tex->PSM = GS_PSM_T8;
+        tex->ClutPSM = GS_PSM_CT32;
+
+        if (entry->clutIndex >= gs->clut8Count) {
+            fprintf(stderr, "GsRenderer: CLUT8 index %u out of range (max %u) for tile (bg=%d)\n", entry->clutIndex, gs->clut8Count - 1, entry->bgDef);
+            abort();
+        }
+
+        tex->VramClut = gs->clut8VramAddrs[entry->clutIndex];
+    }
+
+    return true;
+}
+
 // ===[ Vtable Implementations ]===
 
 static void gsInit(Renderer* renderer, DataWin* dataWin) {
@@ -532,6 +616,7 @@ static void gsInit(Renderer* renderer, DataWin* dataWin) {
 static void gsDestroy(Renderer* renderer) {
     GsRenderer* gs = (GsRenderer*) renderer;
     free(gs->atlasTPAGEntries);
+    free(gs->atlasTileEntries);
     free(gs->chunks);
     free(gs->atlasToChunk);
     free(gs->atlasBpp);
@@ -888,6 +973,60 @@ static void gsDeleteSprite([[maybe_unused]] Renderer* renderer, [[maybe_unused]]
     // No-op
 }
 
+static void gsDrawTile(Renderer* renderer, RoomTile* tile, float offsetX, float offsetY) {
+    GsRenderer* gs = (GsRenderer*) renderer;
+
+    // Look up the tile in the atlas tile entries
+    AtlasTileEntry* tileEntry = findTileEntry(gs, (int16_t) tile->backgroundDefinition, (uint16_t) tile->sourceX, (uint16_t) tile->sourceY, (uint16_t) tile->width, (uint16_t) tile->height);
+    if (tileEntry == nullptr)
+        return;
+
+    // Set up GSTEXTURE for this tile entry
+    GSTEXTURE tex;
+    if (!setupTextureForTile(gs, &tex, tileEntry))
+        return;
+
+    // Compute screen rect in game coordinates
+    float drawX = (float) tile->x + offsetX;
+    float drawY = (float) tile->y + offsetY;
+    float drawW = (float) tile->width * tile->scaleX;
+    float drawH = (float) tile->height * tile->scaleY;
+
+    float sx1 = (drawX - (float) gs->viewX) * gs->scaleX + gs->offsetX;
+    float sy1 = (drawY - (float) gs->viewY) * gs->scaleY + gs->offsetY;
+    float sx2 = (drawX + drawW - (float) gs->viewX) * gs->scaleX + gs->offsetX;
+    float sy2 = (drawY + drawH - (float) gs->viewY) * gs->scaleY + gs->offsetY;
+
+    // View frustum culling
+    float minSX = (sx1 < sx2) ? sx1 : sx2;
+    float maxSX = (sx1 > sx2) ? sx1 : sx2;
+    float minSY = (sy1 < sy2) ? sy1 : sy2;
+    float maxSY = (sy1 > sy2) ? sy1 : sy2;
+    if (maxSX < 0.0f || minSX > PS2_SCREEN_WIDTH || maxSY < 0.0f || minSY > PS2_SCREEN_HEIGHT)
+        return;
+
+    // UV coordinates in atlas texels
+    float u1 = (float) tileEntry->atlasX;
+    float v1 = (float) tileEntry->atlasY;
+    float u2 = u1 + (float) tileEntry->width;
+    float v2 = v1 + (float) tileEntry->height;
+
+    // Extract alpha from tile color high byte, default to 1.0 if 0
+    uint8_t alphaByte = (tile->color >> 24) & 0xFF;
+    float alpha = (alphaByte == 0) ? 1.0f : (float) alphaByte / 255.0f;
+    uint32_t bgr = tile->color & 0x00FFFFFF;
+
+    // GS modulate mode: scale RGB from 0-255 to 0-128
+    uint8_t r = BGR_R(bgr) >> 1;
+    uint8_t g = BGR_G(bgr) >> 1;
+    uint8_t b = BGR_B(bgr) >> 1;
+    uint8_t a = (uint8_t) (alpha * 128.0f);
+    u64 gsColor = GS_SETREG_RGBAQ(r, g, b, a, 0x00);
+
+    gsKit_prim_sprite_texture(gs->gsGlobal, &tex, sx1, sy1, u1, v1, sx2, sy2, u2, v2, gs->zCounter, gsColor);
+    gs->zCounter++;
+}
+
 // ===[ Vtable ]===
 
 static RendererVtable gsVtable = {
@@ -905,6 +1044,7 @@ static RendererVtable gsVtable = {
     .flush = gsFlush,
     .createSpriteFromSurface = gsCreateSpriteFromSurface,
     .deleteSprite = gsDeleteSprite,
+    .drawTile = gsDrawTile,
 };
 
 // ===[ Public API ]===

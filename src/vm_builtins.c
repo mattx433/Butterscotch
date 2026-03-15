@@ -72,6 +72,26 @@ static DsMapEntry** dsMapGet(int32_t id) {
     return &dsMapPool[id];
 }
 
+// ===[ DS_LIST SYSTEM ]===
+
+typedef struct {
+    RValue* items; // stb_ds dynamic array of RValues
+} DsList;
+
+static DsList* dsListPool = nullptr; // stb_ds array of DsList
+
+static int32_t dsListCreate(void) {
+    DsList newList = { .items = nullptr };
+    int32_t id = (int32_t) arrlen(dsListPool);
+    arrput(dsListPool, newList);
+    return id;
+}
+
+static DsList* dsListGet(int32_t id) {
+    if (0 > id || id > (int32_t) arrlen(dsListPool)) return nullptr;
+    return &dsListPool[id];
+}
+
 // ===[ BUILT-IN VARIABLE GET/SET ]===
 
 /**
@@ -1326,21 +1346,61 @@ static RValue builtinDsMapDestroy([[maybe_unused]] VMContext* ctx, RValue* args,
     return RValue_makeUndefined();
 }
 
-// ===[ DS_LIST STUBS ]===
+// ===[ DS_LIST FUNCTIONS ]===
 
-static RValue builtinDsListCreate(VMContext* ctx, [[maybe_unused]] RValue* args, [[maybe_unused]] int32_t argCount) {
-    logStubbedFunction(ctx, "ds_list_create");
-    return RValue_makeReal(0.0);
+static RValue builtinDsListCreate([[maybe_unused]] VMContext* ctx, [[maybe_unused]] RValue* args, [[maybe_unused]] int32_t argCount) {
+    return RValue_makeReal((double) dsListCreate());
 }
 
-static RValue builtinDsListAdd(VMContext* ctx, [[maybe_unused]] RValue* args, [[maybe_unused]] int32_t argCount) {
-    logStubbedFunction(ctx, "ds_list_add");
+static RValue builtinDsListAdd([[maybe_unused]] VMContext* ctx, RValue* args, int32_t argCount) {
+    int32_t id = RValue_toInt32(args[0]);
+    DsList* list = dsListGet(id);
+    if (list == nullptr) return RValue_makeUndefined();
+    // ds_list_add can take multiple values after the list id
+    repeat(argCount - 1, i) {
+        RValue val = args[i + 1];
+        if (val.type == RVALUE_STRING) {
+            val = RValue_makeOwnedString(strdup(val.string));
+        }
+        arrput(list->items, val);
+    }
     return RValue_makeUndefined();
 }
 
-static RValue builtinDsListSize(VMContext* ctx, [[maybe_unused]] RValue* args, [[maybe_unused]] int32_t argCount) {
-    logStubbedFunction(ctx, "ds_list_size");
-    return RValue_makeReal(0.0);
+static RValue builtinDsListSize([[maybe_unused]] VMContext* ctx, RValue* args, [[maybe_unused]] int32_t argCount) {
+    int32_t id = RValue_toInt32(args[0]);
+    DsList* list = dsListGet(id);
+    if (list == nullptr) return RValue_makeReal(0.0);
+    return RValue_makeReal((double) arrlen(list->items));
+}
+
+static RValue builtinDsListFindIndex([[maybe_unused]] VMContext* ctx, RValue* args, [[maybe_unused]] int32_t argCount) {
+    int32_t id = RValue_toInt32(args[0]);
+    DsList* list = dsListGet(id);
+    if (list == nullptr) return RValue_makeReal(-1.0);
+    RValue needle = args[1];
+    for (int32_t i = 0; (int32_t) arrlen(list->items) > i; i++) {
+        RValue item = list->items[i];
+        if (item.type != needle.type) continue;
+        switch (item.type) {
+            case RVALUE_REAL:
+                if (item.real == needle.real) return RValue_makeReal((double) i);
+                break;
+            case RVALUE_INT32:
+            case RVALUE_BOOL:
+                if (item.int32 == needle.int32) return RValue_makeReal((double) i);
+                break;
+            case RVALUE_INT64:
+                if (item.int64 == needle.int64) return RValue_makeReal((double) i);
+                break;
+            case RVALUE_STRING:
+                if (item.string != nullptr && needle.string != nullptr && strcmp(item.string, needle.string) == 0) return RValue_makeReal((double) i);
+                break;
+            default:
+                break;
+        }
+    }
+    return RValue_makeReal(-1.0);
 }
 
 // ===[ ARRAY FUNCTIONS ]===
@@ -3048,6 +3108,7 @@ void VMBuiltins_registerAll(void) {
     registerBuiltin("ds_list_create", builtinDsListCreate);
     registerBuiltin("ds_list_add", builtinDsListAdd);
     registerBuiltin("ds_list_size", builtinDsListSize);
+    registerBuiltin("ds_list_find_index", builtinDsListFindIndex);
 
     // Array
     registerBuiltin("array_length_1d", builtinArrayLengthId);

@@ -56,6 +56,12 @@ if(PLATFORM STREQUAL "glfw")
         target_link_options(butterscotch PRIVATE -fsanitize=address)
     endif()
 elseif(PLATFORM STREQUAL "ps2")
+    # The PS2 EE has a single-precision FPU only, so double is software-emulated
+    add_compile_definitions(USE_FLOAT_REALS)
+    # Treat unsuffixed float constants as single-precision to avoid accidental
+    # float->double promotions on platforms with no hardware double
+    add_compile_options(-fsingle-precision-constant)
+
     if(PS2)
         # Compiling on the Docker container
         target_include_directories(butterscotch PRIVATE $ENV{PS2SDK}/ee/include $ENV{PS2SDK}/common/include $ENV{PS2DEV}/ee/include $ENV{GSKIT}/include)

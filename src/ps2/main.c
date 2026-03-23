@@ -496,6 +496,7 @@ int main(int argc, char* argv[]) {
     float lastFrameTimeMs = 0.0f;
     u64 lastVsyncTime = GetTimerSystemTime();
     double accumulator = 0.0; // seconds of game time accumulated
+    bool debugOverlayEnabled = JsonReader_getBool(JsonReader_getObject(configRoot, "debugOverlayEnabled"));
 
     // FPS tracking: count rendered frames (screen flips) over a 1-second window
     int renderFpsCounter = 0;
@@ -561,6 +562,10 @@ int main(int argc, char* argv[]) {
                     break;
                 }
             }
+        }
+
+        if (RunnerKeyboard_checkPressed(runner->keyboard, VK_F12)) {
+            debugOverlayEnabled = !debugOverlayEnabled;
         }
 
         // Reset global interact state because I HATE when I get stuck while moving through rooms
@@ -749,7 +754,7 @@ int main(int argc, char* argv[]) {
             lastFrameTimeMs = (float) (frameEndTime - frameStartTime) / (float) (kBUSCLK / 1000);
 
             // ===[ Debug Overlay ]===
-            {
+            if (debugOverlayEnabled) {
                 u64 debugColor = GS_SETREG_RGBAQ(0xFF, 0xFF, 0xFF, 0x80, 0x00);
                 // sbrk(0) returns the actual heap frontier; true free = top of RAM - sbrk frontier
                 void* heapTop = sbrk(0);

@@ -8,7 +8,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#ifdef _WIN32
+#include <windows.h>
+#else
 #include <malloc.h>
+#endif
 
 #include "runner_keyboard.h"
 #include "runner.h"
@@ -386,10 +390,12 @@ int main(int argc, char* argv[]) {
     Gen8* gen8 = &dataWin->gen8;
     printf("Loaded \"%s\" (%d) successfully!\n", gen8->name, gen8->gameID);
 
+    #ifndef _WIN32
     {
         struct mallinfo2 mi = mallinfo2();
         printf("Memory after data.win parsing: used=%zu bytes (%.1f KB)\n", mi.uordblks, mi.uordblks / 1024.0f);
     }
+    #endif
 
     // Build window title
     char windowTitle[256];
@@ -772,11 +778,15 @@ int main(int argc, char* argv[]) {
             // Sleep for most of the remaining time, then spin-wait for precision
             double remaining = nextFrameTime - glfwGetTime();
             if (remaining > 0.002) {
+                #ifdef _WIN32
+                Sleep((DWORD) ((remaining - 0.001) * 1000));
+                #else
                 struct timespec ts = {
                     .tv_sec = 0,
                     .tv_nsec = (long) ((remaining - 0.001) * 1e9)
                 };
                 nanosleep(&ts, nullptr);
+                #endif
             }
             while (glfwGetTime() < nextFrameTime) {
                 // Spin-wait for the remaining sub-millisecond

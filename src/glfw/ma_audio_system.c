@@ -1,5 +1,11 @@
+// On Windows, include windows.h first so its headers are processed before stb_vorbis
+// defines single-letter macros (L, C, R) that conflict with winnt.h struct field names.
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 // Include stb_vorbis BEFORE miniaudio so that STB_VORBIS_INCLUDE_STB_VORBIS_H is defined,
-// which enables miniaudio's built-in OGG Vorbis decoding support
+// which enables miniaudio's built-in OGG Vorbis decoding support.
 #include "stb_vorbis.c"
 
 #define MINIAUDIO_IMPLEMENTATION

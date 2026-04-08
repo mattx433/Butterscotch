@@ -3978,6 +3978,45 @@ static RValue builtinActionSetAlarm(VMContext* ctx, MAYBE_UNUSED RValue* args, M
     return RValue_makeUndefined();
 }
 
+static RValue builtinAlarmSet(VMContext* ctx, MAYBE_UNUSED RValue* args, MAYBE_UNUSED int32_t argCount) {
+    int32_t alarmIndex = RValue_toInt32(args[0]);
+    int32_t value = RValue_toInt32(args[1]);
+
+    if (0 > alarmIndex || alarmIndex >= GML_ALARM_COUNT) {
+        return RValue_makeUndefined();
+    }
+
+    if (ctx->currentInstance != nullptr) {
+        Instance* inst = (Instance*) ctx->currentInstance;
+
+#ifndef DISABLE_VM_TRACING
+        Runner* runner = (Runner*) ctx->runner;
+        if (shgeti(ctx->alarmsToBeTraced, "*") != -1 || shgeti(ctx->alarmsToBeTraced, runner->dataWin->objt.objects[inst->objectIndex].name) != -1) {
+            fprintf(stderr, "VM: [%s] Setting Alarm[%d] = %d (instanceId=%d)\n", runner->dataWin->objt.objects[inst->objectIndex].name, alarmIndex, value, inst->instanceId);
+        }
+#endif
+
+        inst->alarm[alarmIndex] = value;
+    }
+
+    return RValue_makeUndefined();
+}
+
+static RValue builtinAlarmGet(VMContext* ctx, MAYBE_UNUSED RValue* args, MAYBE_UNUSED int32_t argCount) {
+    int32_t alarmIndex = RValue_toInt32(args[0]);
+
+    if (0 > alarmIndex || alarmIndex >= GML_ALARM_COUNT) {
+        return RValue_makeReal(-1);
+    }
+
+    if (ctx->currentInstance != nullptr) {
+        Instance* inst = (Instance*) ctx->currentInstance;
+        return RValue_makeReal((GMLReal) inst->alarm[alarmIndex]);
+    }
+
+    return RValue_makeReal(-1);
+}
+
 static RValue builtinActionIfVariable(VMContext* ctx, MAYBE_UNUSED RValue* args, MAYBE_UNUSED int32_t argCount) {
     bool check;
     switch (args[0].type) {
@@ -4716,6 +4755,8 @@ void VMBuiltins_registerAll(bool isGMS2) {
     registerBuiltin("get_timer", builtin_get_timer);
     registerBuiltin("action_if_variable", builtinActionIfVariable);
     registerBuiltin("action_set_alarm", builtinActionSetAlarm);
+    registerBuiltin("alarm_set", builtinAlarmSet);
+    registerBuiltin("alarm_get", builtinAlarmGet);
     registerBuiltin("action_sound",builtin_action_sound);
     registerBuiltin("string_hash_to_newline", builtinStringHashToNewline);
     registerBuiltin("json_decode", builtinJsonDecode);

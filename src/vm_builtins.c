@@ -708,7 +708,14 @@ static RValue builtinShowDebugMessage(MAYBE_UNUSED VMContext* ctx, RValue* args,
 static RValue builtinStringLength(MAYBE_UNUSED VMContext* ctx, RValue* args, int32_t argCount) {
     if (1 > argCount) return RValue_makeInt32(0);
     // GML converts non-string arguments to string before measuring length
-    char* str = RValue_toString(args[0]);
+    RValue value = args[0];
+    // Fast path: If the RValue is already a string, just return its length instead of creating a copy
+    if (value.type == RVALUE_STRING) {
+        if (value.string == nullptr)
+            return RValue_makeInt32(0);
+        return RValue_makeInt32((int32_t) strlen(value.string));
+    }
+    char* str = RValue_toString(value);
     int32_t len = (int32_t) strlen(str);
     free(str);
     return RValue_makeInt32(len);

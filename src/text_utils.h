@@ -83,34 +83,62 @@ static inline float TextUtils_measureLineWidth(Font* font, const char* line, int
     return width;
 }
 
-// Preprocesses GML text: converts unescaped # to \n, and \# to literal #.
-// Returns a heap-allocated string that must be freed by the caller.
-static inline char* TextUtils_preprocessGmlText(const char* text) {
-    int32_t len = (int32_t) strlen(text);
-    char* result = safeMalloc(len + 1);
-    int32_t out = 0;
+// Result of GML text preprocessing. If owning is true, the caller must free the text pointer.
+typedef struct {
+    const char* text;
+    bool owning;
+} PreprocessedText;
 
-    repeat(len, i) {
+// Frees the text pointer if it is owning.
+static inline void PreprocessedText_free(PreprocessedText pt) {
+    if (pt.owning) free((char*) pt.text);
+}
+
+// Preprocesses GML text: converts unescaped # to \n, and \# to literal #.
+// Uses a fused single-pass approach: scans for # and only allocates if one is found.
+static inline PreprocessedText TextUtils_preprocessGmlText(const char* text) {
+    int32_t len = (int32_t) strlen(text);
+
+    // Scan until we find a #
+    for (int32_t i = 0; len > i; i++) {
         if (text[i] == '#') {
+            // Found one - allocate and process from here
+            char* result = safeMalloc(len + 1);
+            memcpy(result, text, i);
+            int32_t out = i;
+
+            // Check if the # is escaped (\#)
             if (out > 0 && result[out - 1] == '\\') {
-                // \# -> replace the already-written backslash with literal #
                 result[out - 1] = '#';
             } else {
                 result[out++] = '\n';
             }
-        } else {
-            result[out++] = text[i];
+
+            // Process the rest of the string
+            for (int32_t j = i + 1; len > j; j++) {
+                if (text[j] == '#') {
+                    if (out > 0 && result[out - 1] == '\\') {
+                        result[out - 1] = '#';
+                    } else {
+                        result[out++] = '\n';
+                    }
+                } else {
+                    result[out++] = text[j];
+                }
+            }
+            result[out] = '\0';
+            return (PreprocessedText){ .text = result, .owning = true };
         }
     }
-    result[out] = '\0';
-    return result;
+
+    // No # found, return original pointer without allocating
+    return (PreprocessedText){ .text = text, .owning = false };
 }
 
 // Preprocess GML text ONLY if the runner is not GameMaker: Studio 2
-// Returns a heap-allocated string that must be freed by the caller
-static inline char* TextUtils_preprocessGmlTextIfNeeded(Runner* runner, const char* text) {
+static inline PreprocessedText TextUtils_preprocessGmlTextIfNeeded(Runner* runner, const char* text) {
     if (runner->isGMS2)
-        return safeStrdup(text);
+        return (PreprocessedText){ .text = text, .owning = false };
     return TextUtils_preprocessGmlText(text);
 }
 

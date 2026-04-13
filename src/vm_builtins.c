@@ -3502,9 +3502,9 @@ static RValue builtin_drawText(VMContext* ctx, RValue* args, MAYBE_UNUSED int32_
     float y = (float) RValue_toReal(args[1]);
     char* str = RValue_toString(args[2]);
 
-    char* processedText = TextUtils_preprocessGmlTextIfNeeded(runner, str);
-    runner->renderer->vtable->drawText(runner->renderer, processedText, x, y, 1.0f, 1.0f, 0.0f);
-    free(processedText);
+    PreprocessedText processedText = TextUtils_preprocessGmlTextIfNeeded(runner, str);
+    runner->renderer->vtable->drawText(runner->renderer, processedText.text, x, y, 1.0f, 1.0f, 0.0f);
+    PreprocessedText_free(processedText);
     free(str);
     return RValue_makeUndefined();
 }
@@ -3520,9 +3520,9 @@ static RValue builtin_drawTextTransformed(VMContext* ctx, RValue* args, MAYBE_UN
     float yscale = (float) RValue_toReal(args[4]);
     float angle = (float) RValue_toReal(args[5]);
 
-    char* processedText = TextUtils_preprocessGmlTextIfNeeded(runner, str);
-    runner->renderer->vtable->drawText(runner->renderer, processedText, x, y, xscale, yscale, angle);
-    free(processedText);
+    PreprocessedText processedText = TextUtils_preprocessGmlTextIfNeeded(runner, str);
+    runner->renderer->vtable->drawText(runner->renderer, processedText.text, x, y, xscale, yscale, angle);
+    PreprocessedText_free(processedText);
     free(str);
     return RValue_makeUndefined();
 }
@@ -3542,9 +3542,9 @@ static RValue builtin_drawTextColor(VMContext* ctx, RValue* args, MAYBE_UNUSED i
     int32_t c4 = (float) RValue_toInt32(args[6]);
     float alpha = (float) RValue_toReal(args[7]);
 
-    char* processedText = TextUtils_preprocessGmlTextIfNeeded(runner, str);
-    runner->renderer->vtable->drawTextColor(runner->renderer, processedText, x, y, 1.0f, 1.0f, 0.0f, c1, c2, c3, c4, alpha);
-    free(processedText);
+    PreprocessedText processedText = TextUtils_preprocessGmlTextIfNeeded(runner, str);
+    runner->renderer->vtable->drawTextColor(runner->renderer, processedText.text, x, y, 1.0f, 1.0f, 0.0f, c1, c2, c3, c4, alpha);
+    PreprocessedText_free(processedText);
     free(str);
     return RValue_makeUndefined();
 }
@@ -3565,9 +3565,9 @@ static RValue builtin_drawTextColorTransformed(VMContext* ctx, RValue* args, MAY
     int32_t c4 = (float) RValue_toInt32(args[9]);
     float alpha = (float) RValue_toReal(args[10]);
 
-    char* processedText = TextUtils_preprocessGmlTextIfNeeded(runner, str);
-    runner->renderer->vtable->drawTextColor(runner->renderer, processedText, x, y, xscale, yscale, angle, c1, c2, c3, c4, alpha);
-    free(processedText);
+    PreprocessedText processedText = TextUtils_preprocessGmlTextIfNeeded(runner, str);
+    runner->renderer->vtable->drawTextColor(runner->renderer, processedText.text, x, y, xscale, yscale, angle, c1, c2, c3, c4, alpha);
+    PreprocessedText_free(processedText);
     free(str);
     return RValue_makeUndefined();
 }
@@ -3888,31 +3888,31 @@ static RValue builtin_stringWidth(VMContext* ctx, RValue* args, int32_t argCount
     Font* font = &renderer->dataWin->font.fonts[fontIndex];
     char* str = RValue_toString(args[0]);
 
-    char* processed = TextUtils_preprocessGmlTextIfNeeded(runner, str);
+    PreprocessedText processed = TextUtils_preprocessGmlTextIfNeeded(runner, str);
     free(str);
-    int32_t textLen = (int32_t) strlen(processed);
+    int32_t textLen = (int32_t) strlen(processed.text);
 
     // Find the widest line
     float maxWidth = 0;
     int32_t lineStart = 0;
     while (textLen >= lineStart) {
         int32_t lineEnd = lineStart;
-        while (textLen > lineEnd && !TextUtils_isNewlineChar(processed[lineEnd])) {
+        while (textLen > lineEnd && !TextUtils_isNewlineChar(processed.text[lineEnd])) {
             lineEnd++;
         }
         int32_t lineLen = lineEnd - lineStart;
 
-        float lineWidth = TextUtils_measureLineWidth(font, processed + lineStart, lineLen);
+        float lineWidth = TextUtils_measureLineWidth(font, processed.text + lineStart, lineLen);
         if (lineWidth > maxWidth) maxWidth = lineWidth;
 
         if (textLen > lineEnd) {
-            lineStart = TextUtils_skipNewline(processed, lineEnd, textLen);
+            lineStart = TextUtils_skipNewline(processed.text, lineEnd, textLen);
         } else {
             break;
         }
     }
 
-    free(processed);
+    PreprocessedText_free(processed);
     return RValue_makeReal((GMLReal) (maxWidth * font->scaleX));
 }
 
@@ -3926,11 +3926,11 @@ static RValue builtin_stringHeight(VMContext* ctx, RValue* args, int32_t argCoun
     Font* font = &renderer->dataWin->font.fonts[fontIndex];
     char* str = RValue_toString(args[0]);
 
-    char* processed = TextUtils_preprocessGmlTextIfNeeded(runner, str);
+    PreprocessedText processed = TextUtils_preprocessGmlTextIfNeeded(runner, str);
     free(str);
-    int32_t textLen = (int32_t) strlen(processed);
-    int32_t lineCount = TextUtils_countLines(processed, textLen);
-    free(processed);
+    int32_t textLen = (int32_t) strlen(processed.text);
+    int32_t lineCount = TextUtils_countLines(processed.text, textLen);
+    PreprocessedText_free(processed);
 
     return RValue_makeReal((GMLReal) ((float) lineCount * (float) font->emSize * font->scaleY));
 }
@@ -4531,14 +4531,13 @@ static RValue builtinStringHashToNewline(MAYBE_UNUSED VMContext* ctx, RValue* ar
         return RValue_makeString("");
     }
 
-    if (strchr(original.string, '#') == nullptr) {
-        // Fast path: if there isn't a "#" in the string, we can steal the reference to avoid copying the string
-        args[0].ownsString = false; // We are stealing the ownership of this, kthxbye
+    PreprocessedText result = TextUtils_preprocessGmlText(original.string);
+    if (!result.owning) {
+        // No # found, steal the reference to avoid copying the string
+        args[0].ownsString = false;
         return original;
     }
-
-    char *result = TextUtils_preprocessGmlText(original.string);
-    return RValue_makeOwnedString(result);
+    return RValue_makeOwnedString((char*) result.text);
 }
 
 // json_decode

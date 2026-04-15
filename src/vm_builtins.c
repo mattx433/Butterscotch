@@ -2791,8 +2791,12 @@ static RValue builtinWindowGetHeight(VMContext* ctx, MAYBE_UNUSED RValue* args, 
     return RValue_makeReal((GMLReal) ctx->dataWin->gen8.defaultWindowHeight);
 }
 
-// Game stubs
-STUB_RETURN_UNDEFINED(game_restart)
+// ===[ Game State Functions ]===
+static RValue builtinGameRestart(VMContext* ctx, MAYBE_UNUSED RValue* args, MAYBE_UNUSED int32_t argCount) {
+    ctx->runner->pendingRoom = ROOM_RESTARTGAME;
+    return RValue_makeUndefined();
+}
+
 static RValue builtinGameEnd(VMContext* ctx, MAYBE_UNUSED RValue* args, MAYBE_UNUSED int32_t argCount) {
     Runner* runner = (Runner*) ctx->runner;
     runner->shouldExit = true;
@@ -4978,7 +4982,7 @@ void VMBuiltins_registerAll(bool isGMS2) {
     registerBuiltin("window_get_height", builtinWindowGetHeight);
 
     // Game
-    registerBuiltin("game_restart", builtin_game_restart);
+    registerBuiltin("game_restart", builtinGameRestart);
     registerBuiltin("game_end", builtinGameEnd);
     registerBuiltin("game_save", builtin_game_save);
     registerBuiltin("game_load", builtin_game_load);

@@ -33,6 +33,9 @@
 #define VARTYPE_NORMAL    0xA0
 #define VARTYPE_INSTANCE  0xE0
 
+// ===[ Room Constants ]===
+#define ROOM_RESTARTGAME (-200) // The reason why it is -200 is because the GameMaker-HTML5 runner uses -200 too (see Globals.js)
+
 // ===[ GML Math Epsilon (used for floating-point comparisons) ]===
 // The real GameMaker runner uses epsilon-based comparison for all numeric CMP operations.
 // Default value matches the HTML5 runner's g_GMLMathEpsilon (1e-5 for double precision).

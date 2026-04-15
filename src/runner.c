@@ -808,7 +808,55 @@ static void initRoom(Runner* runner, int32_t roomIndex) {
     fprintf(stderr, "Runner: Room loaded: %s (room %d) with %d instances\n", room->name, roomIndex, (int) arrlen(runner->instances));
 }
 
+// Cleans up the runner state, used when freeing the Runner or when restarting the Runner
+static void cleanupState(Runner* runner) {
+    // Free all instances
+    repeat(arrlen(runner->instances), i) {
+        hmdel(runner->instancesToId, runner->instances[i]->instanceId);
+        Instance_free(runner->instances[i]);
+    }
+    arrfree(runner->instances);
+    runner->instances = nullptr;
+
+    // Free saved room states
+    if (runner->savedRoomStates != nullptr) {
+        repeat(runner->dataWin->room.count, i) {
+            SavedRoomState* state = &runner->savedRoomStates[i];
+            int32_t savedCount = (int32_t) arrlen(state->instances);
+            repeat(savedCount, j) {
+                hmdel(runner->instancesToId, state->instances[j]->instanceId);
+                Instance_free(state->instances[j]);
+            }
+            arrfree(state->instances);
+            hmfree(state->tileLayerMap);
+        }
+        free(runner->savedRoomStates);
+    }
+    runner->savedRoomStates = nullptr;
+
+    hmfree(runner->instancesToId);
+    runner->instancesToId = nullptr;
+    hmfree(runner->tileLayerMap);
+    runner->tileLayerMap = nullptr;
+    shfree(runner->disabledObjects);
+    runner->disabledObjects = nullptr;
+}
+
 // ===[ Public API ]===
+
+void Runner_reset(Runner* runner) {
+    // This actually sets the default runner values, used for initialization and restarting
+    cleanupState(runner);
+
+    runner->pendingRoom = -1;
+    runner->gameStartFired = false;
+    runner->currentRoomIndex = -1;
+    runner->currentRoomOrderPosition = -1;
+    runner->nextInstanceId = runner->dataWin->gen8.lastObj + 1;
+    runner->savedRoomStates = safeCalloc(runner->dataWin->room.count, sizeof(SavedRoomState));
+    if (runner->audioSystem != nullptr)
+        runner->audioSystem->vtable->stopAll(runner->audioSystem);
+}
 
 Runner* Runner_create(DataWin* dataWin, VMContext* vm, FileSystem* fileSystem) {
     Runner* runner = safeCalloc(1, sizeof(Runner));
@@ -816,15 +864,10 @@ Runner* Runner_create(DataWin* dataWin, VMContext* vm, FileSystem* fileSystem) {
     runner->vmContext = vm;
     runner->fileSystem = fileSystem;
     runner->frameCount = 0;
-    runner->instances = nullptr;
-    runner->pendingRoom = -1;
-    runner->gameStartFired = false;
-    runner->currentRoomIndex = -1;
-    runner->currentRoomOrderPosition = -1;
-    runner->nextInstanceId = dataWin->gen8.lastObj + 1;
-    runner->keyboard = RunnerKeyboard_create();
-    runner->savedRoomStates = safeCalloc(dataWin->room.count, sizeof(SavedRoomState));
     runner->isGMS2 = (dataWin->gen8.major >= 2);
+    runner->keyboard = RunnerKeyboard_create();
+
+    Runner_reset(runner);
 
     // Link runner to VM context
     vm->runner = (struct Runner*) runner;
@@ -1345,6 +1388,15 @@ void Runner_step(Runner* runner) {
     // Update view following and clamping
     updateViews(runner);
 
+    // Handle game restart
+    if (runner->pendingRoom == ROOM_RESTARTGAME) {
+        // See you soon!
+        Runner_reset(runner);
+        Runner_initFirstRoom(runner);
+        runner->frameCount++;
+        return;
+    }
+
     // Handle room transition
     if (runner->pendingRoom >= 0) {
         int32_t oldRoomIndex = runner->currentRoomIndex;
@@ -1835,31 +1887,8 @@ char* Runner_dumpStateJson(Runner* runner) {
 void Runner_free(Runner* runner) {
     if (runner == nullptr) return;
 
-    // Free all instances
-    repeat(arrlen(runner->instances), i) {
-        hmdel(runner->instancesToId, runner->instances[i]->instanceId);
-        Instance_free(runner->instances[i]);
-    }
-    arrfree(runner->instances);
+    cleanupState(runner);
 
-    // Free saved room states
-    if (runner->savedRoomStates != nullptr) {
-        repeat(runner->dataWin->room.count, i) {
-            SavedRoomState* state = &runner->savedRoomStates[i];
-            int32_t savedCount = (int32_t) arrlen(state->instances);
-            repeat(savedCount, j) {
-                hmdel(runner->instancesToId, state->instances[j]->instanceId);
-                Instance_free(state->instances[j]);
-            }
-            arrfree(state->instances);
-            hmfree(state->tileLayerMap);
-        }
-        free(runner->savedRoomStates);
-    }
-
-    hmfree(runner->instancesToId);
-    hmfree(runner->tileLayerMap);
-    shfree(runner->disabledObjects);
     RunnerKeyboard_free(runner->keyboard);
     free(runner);
 }

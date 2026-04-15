@@ -19,6 +19,7 @@ typedef enum {
     RVALUE_UNDEFINED = 5,
     RVALUE_ARRAY_REF = 6,
     RVALUE_METHOD = 7,
+    RVALUE_GML_ARRAY = 8, // V17+: array reference for pushaf/popaf/pushac (carries varID + scope)
 } RValueType;
 
 typedef struct {
@@ -33,6 +34,10 @@ typedef struct {
             int32_t codeIndex;       // CODE entry index for the function body
             int32_t boundInstanceId; // instance ID to use as self (-1 = unbound/current self)
         } method;
+        struct {
+            int32_t varID;           // variable ID in the array map
+            int32_t scope;           // instance type: INSTANCE_LOCAL, INSTANCE_GLOBAL, INSTANCE_SELF, or instance/object ID
+        } gmlArray;
     };
     // We use uint8_t for the type instead of RValueType because a enum value occupies 4 bytes, while uint8_t occupies 1 byte
     uint8_t type;
@@ -87,6 +92,10 @@ static RValue RValue_makeMethod(int32_t codeIndex, int32_t boundInstanceId) {
     return (RValue){ .method = { .codeIndex = codeIndex, .boundInstanceId = boundInstanceId }, .type = RVALUE_METHOD };
 }
 
+static RValue RValue_makeGMLArray(int32_t varID, int32_t scope) {
+    return (RValue){ .gmlArray = { .varID = varID, .scope = scope }, .type = RVALUE_GML_ARRAY };
+}
+
 // Converts an RValue to a heap-allocated string representation.
 // The caller must free the returned string
 static char* RValue_toString(RValue val) {
@@ -114,6 +123,9 @@ static char* RValue_toString(RValue val) {
             return safeStrdup(buf);
         case RVALUE_METHOD:
             snprintf(buf, sizeof(buf), "<method:%d>", val.method.codeIndex);
+            return safeStrdup(buf);
+        case RVALUE_GML_ARRAY:
+            snprintf(buf, sizeof(buf), "<gml_array:var%d@%d>", val.gmlArray.varID, val.gmlArray.scope);
             return safeStrdup(buf);
     }
     return safeStrdup("");
@@ -175,6 +187,9 @@ static char* RValue_toStringTyped(RValue val) {
         case RVALUE_METHOD:
             snprintf(buf, sizeof(buf), "method(code=%d, inst=%d)", val.method.codeIndex, val.method.boundInstanceId);
             return safeStrdup(buf);
+        case RVALUE_GML_ARRAY:
+            snprintf(buf, sizeof(buf), "<gml_array:var%d@%d>", val.gmlArray.varID, val.gmlArray.scope);
+            return safeStrdup(buf);
     }
     return safeStrdup("???");
 }
@@ -198,6 +213,7 @@ static GMLReal RValue_toReal(RValue val) {
         case RVALUE_STRING: return GMLReal_strtod(val.string, nullptr);
         case RVALUE_ARRAY_REF: return 0.0;
         case RVALUE_METHOD: return 0.0;
+        case RVALUE_GML_ARRAY: return 0.0;
         default:            return 0.0;
     }
 }
@@ -213,6 +229,7 @@ static int32_t RValue_toInt32(RValue val) {
         case RVALUE_STRING: return (int32_t) GMLReal_strtod(val.string, nullptr);
         case RVALUE_ARRAY_REF: return 0;
         case RVALUE_METHOD: return 0;
+        case RVALUE_GML_ARRAY: return 0;
         default:            return 0;
     }
 }
@@ -228,6 +245,7 @@ static int64_t RValue_toInt64(RValue val) {
         case RVALUE_STRING: return (int64_t) GMLReal_strtod(val.string, nullptr);
         case RVALUE_ARRAY_REF: return 0;
         case RVALUE_METHOD: return 0;
+        case RVALUE_GML_ARRAY: return 0;
         default:            return 0;
     }
 }
@@ -243,6 +261,7 @@ static bool RValue_toBool(RValue val) {
         case RVALUE_STRING: return val.string != nullptr && val.string[0] != '\0';
         case RVALUE_ARRAY_REF: return false;
         case RVALUE_METHOD: return true;
+        case RVALUE_GML_ARRAY: return false;
         default:            return false;
     }
 }

@@ -94,6 +94,22 @@
 #define OP_CALL     0xD9
 #define OP_BREAK    0xFF
 
+// ===[ Extended BREAK Sub-Opcodes (bytecode version 17+) ]===
+// Encoded in bits 0-15 of the BREAK instruction (instrInstanceType field, as int16_t)
+#define BREAK_CHKINDEX     (-1)  // Validate array index bounds
+#define BREAK_PUSHAF       (-2)  // Pop array ref + index, push element (final dimension)
+#define BREAK_POPAF        (-3)  // Pop value + array ref + index, store at index
+#define BREAK_PUSHAC       (-4)  // Pop array ref + index, push sub-array ref (intermediate dimension)
+#define BREAK_SETOWNER     (-5)  // Pop and discard (copy-on-write owner tracking)
+#define BREAK_ISSTATICOK   (-6)  // Push bool: has static init already run for this function?
+#define BREAK_SETSTATIC    (-7)  // Mark current function's static as initialized
+#define BREAK_SAVEAREF     (-8)  // Save top-of-stack array ref for compound assignment
+#define BREAK_RESTOREAREF  (-9)  // Push previously saved array ref
+
+// ===[ Variable Types for V17 Array Access ]===
+#define VARTYPE_ARRAYPUSHAF 0x10  // Push array reference (read context)
+#define VARTYPE_ARRAYPOPAF  0x90  // Push array reference (write context)
+
 // ===[ FuncCallCache - Cached resolution for CALL instructions ]===
 // Avoids per-call string hash lookups in both the builtin map and funcMap.
 // Resolved once during VM_create, then used directly by handleCall.
@@ -114,6 +130,7 @@ typedef struct CallFrame {
     CodeLocals* savedCodeLocals;
     RValue* savedScriptArgs;
     int32_t savedScriptArgCount;
+    int32_t savedCurrentCodeIndex;
     struct CallFrame* parent;
 } CallFrame;
 
@@ -167,6 +184,7 @@ typedef struct VMContext {
     ArrayMapEntry* globalArrayMap;
     FuncCallCache* funcCallCache;
     const char* currentCodeName;
+    int32_t currentCodeIndex; // Index into code.entries for the currently executing code
 
     // Warm: touched on calls, variable resolution, event dispatch
     CallFrame* callStack;
@@ -186,6 +204,11 @@ typedef struct VMContext {
     bool traceEventInherited;
     bool hasFixedSeed;
     bool actionRelativeFlag; // D&D action relative flag (set by action_set_relative)
+
+    // V17+ extended BREAK opcode state
+    bool* staticInitialized; // Per-code-entry flag for isstaticok/setstatic (allocated in VM_create)
+    RValue savedArrayRef;    // Saved array reference for savearef/restorearef
+    bool hasSavedArrayRef;   // Whether savedArrayRef is valid
 
     // Cold: init-only or rare lookups
     // Tracks which global varIDs have array data (for array aliasing)

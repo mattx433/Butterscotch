@@ -241,6 +241,68 @@ static int32_t resolveArrayAliasHm(SelfVarEntry* vars, int32_t varID) {
     return current;
 }
 
+// ===[ GML Array Reference Helpers (V17+) ]===
+// These resolve a RVALUE_GML_ARRAY to the appropriate array map based on scope,
+// then read/write elements by index.
+
+// Forward declarations needed for array ref helpers
+static Instance* findInstanceByTarget(VMContext* ctx, int32_t target);
+static uint32_t resolveLocalSlot(VMContext* ctx, int32_t varID);
+
+static ArrayMapEntry** resolveArrayMap(VMContext* ctx, RValue* arrayRef, int32_t* outVarID) {
+    require(arrayRef->type == RVALUE_GML_ARRAY);
+    int32_t varID = arrayRef->gmlArray.varID;
+    int32_t scope = arrayRef->gmlArray.scope;
+    *outVarID = varID;
+
+    switch (scope) {
+        case INSTANCE_LOCAL: {
+            *outVarID = (int32_t) resolveLocalSlot(ctx, varID);
+            return &ctx->localArrayMap;
+        }
+        case INSTANCE_GLOBAL: {
+            // Resolve aliases for global arrays
+            *outVarID = resolveArrayAlias(ctx->globalVars, ctx->globalVarCount, varID);
+            return &ctx->globalArrayMap;
+        }
+        case INSTANCE_SELF: {
+            Instance* inst = (Instance*) ctx->currentInstance;
+            require(inst != nullptr);
+            *outVarID = resolveArrayAliasHm(inst->selfVars, varID);
+            return &inst->selfArrayMap;
+        }
+        case INSTANCE_OTHER: {
+            Instance* inst = (Instance*) ctx->otherInstance;
+            if (inst == nullptr) inst = (Instance*) ctx->currentInstance;
+            require(inst != nullptr);
+            *outVarID = resolveArrayAliasHm(inst->selfVars, varID);
+            return &inst->selfArrayMap;
+        }
+        default: {
+            // Object index or instance ID
+            Instance* inst = findInstanceByTarget(ctx, scope);
+            if (inst == nullptr) {
+                fprintf(stderr, "VM: GML array ref: no instance found for scope %d (varID=%d)\n", scope, varID);
+                abort();
+            }
+            *outVarID = resolveArrayAliasHm(inst->selfVars, varID);
+            return &inst->selfArrayMap;
+        }
+    }
+}
+
+static RValue gmlArrayGet(VMContext* ctx, RValue* arrayRef, int32_t index) {
+    int32_t resolvedVarID;
+    ArrayMapEntry** map = resolveArrayMap(ctx, arrayRef, &resolvedVarID);
+    return arrayMapGet(*map, resolvedVarID, index);
+}
+
+static void gmlArraySet(VMContext* ctx, RValue* arrayRef, int32_t index, RValue val) {
+    int32_t resolvedVarID;
+    ArrayMapEntry** map = resolveArrayMap(ctx, arrayRef, &resolvedVarID);
+    arrayMapSet(map, resolvedVarID, index, val);
+}
+
 // ===[ Trace Helpers ]===
 
 #ifndef DISABLE_VM_TRACING
@@ -917,8 +979,15 @@ static void handlePush(VMContext* ctx, uint32_t instr, const uint8_t* extraData)
         case GML_TYPE_VARIABLE: {
             int32_t instanceType = (int32_t) instrInstanceType(instr);
             uint32_t varRef = resolveVarOperand(extraData);
-            RValue val = resolveVariableRead(ctx, instanceType, varRef);
-            stackPush(ctx,val);
+            uint8_t varType = (varRef >> 24) & 0xF8;
+            if (varType == VARTYPE_ARRAYPUSHAF || varType == VARTYPE_ARRAYPOPAF) {
+                // V17: Push a GML array reference for subsequent pushaf/popaf/pushac
+                Variable* varDef = resolveVarDef(ctx, varRef);
+                stackPush(ctx, RValue_makeGMLArray(varDef->varID, instanceType));
+            } else {
+                RValue val = resolveVariableRead(ctx, instanceType, varRef);
+                stackPush(ctx, val);
+            }
             break;
         }
         case GML_TYPE_STRING: {
@@ -939,18 +1008,36 @@ static void handlePush(VMContext* ctx, uint32_t instr, const uint8_t* extraData)
 }
 
 static void handlePushLoc(VMContext* ctx, const uint8_t* extraData) {
-    RValue v = resolveVariableRead(ctx, INSTANCE_LOCAL, resolveVarOperand(extraData));
-    stackPush(ctx, v);
+    uint32_t varRef = resolveVarOperand(extraData);
+    uint8_t varType = (varRef >> 24) & 0xF8;
+    if (varType == VARTYPE_ARRAYPUSHAF || varType == VARTYPE_ARRAYPOPAF) {
+        Variable* varDef = resolveVarDef(ctx, varRef);
+        stackPush(ctx, RValue_makeGMLArray(varDef->varID, INSTANCE_LOCAL));
+    } else {
+        stackPush(ctx, resolveVariableRead(ctx, INSTANCE_LOCAL, varRef));
+    }
 }
 
 static void handlePushGlb(VMContext* ctx, const uint8_t* extraData) {
-    RValue v = resolveVariableRead(ctx, INSTANCE_GLOBAL, resolveVarOperand(extraData));
-    stackPush(ctx, v);
+    uint32_t varRef = resolveVarOperand(extraData);
+    uint8_t varType = (varRef >> 24) & 0xF8;
+    if (varType == VARTYPE_ARRAYPUSHAF || varType == VARTYPE_ARRAYPOPAF) {
+        Variable* varDef = resolveVarDef(ctx, varRef);
+        stackPush(ctx, RValue_makeGMLArray(varDef->varID, INSTANCE_GLOBAL));
+    } else {
+        stackPush(ctx, resolveVariableRead(ctx, INSTANCE_GLOBAL, varRef));
+    }
 }
 
 static void handlePushBltn(VMContext* ctx, uint32_t instr, const uint8_t* extraData) {
-    RValue v = resolveVariableRead(ctx, (int32_t) instrInstanceType(instr), resolveVarOperand(extraData));
-    stackPush(ctx, v);
+    uint32_t varRef = resolveVarOperand(extraData);
+    uint8_t varType = (varRef >> 24) & 0xF8;
+    if (varType == VARTYPE_ARRAYPUSHAF || varType == VARTYPE_ARRAYPOPAF) {
+        Variable* varDef = resolveVarDef(ctx, varRef);
+        stackPush(ctx, RValue_makeGMLArray(varDef->varID, (int32_t) instrInstanceType(instr)));
+    } else {
+        stackPush(ctx, resolveVariableRead(ctx, (int32_t) instrInstanceType(instr), varRef));
+    }
 }
 
 static void handlePushI(VMContext* ctx, uint32_t instr) {
@@ -1986,16 +2073,102 @@ static RValue executeLoop(VMContext* ctx) {
                 handlePopEnv(ctx, instr, instrAddr);
                 break;
 
-            // Break (no-op / debug)
-            case OP_BREAK:
-                if (ctx->dataWin->gen8.bytecodeVersion >= 17) {
-                    // ...unless if we are in bytecode version 17, where it actually is used
-                    // We don't really need to handle it, because it seems that it is only used by the internal GML scripts that GameMaker generates,
-                    // so we can just pop from the stack and discard
-                    RValue value = stackPop(ctx);
-                    RValue_free(&value);
+            // Break (extended opcodes in V17+, no-op/debug in V16)
+            case OP_BREAK: {
+                if (17 > ctx->dataWin->gen8.bytecodeVersion) break;
+                int16_t breakType = instrInstanceType(instr);
+                switch (breakType) {
+                    case BREAK_CHKINDEX: {
+                        // Validate top-of-stack array index is in [0, 32000)
+                        RValue* top = stackPeek(ctx);
+                        int32_t idx = RValue_toInt32(*top);
+                        if (0 > idx || 32000 <= idx) {
+                            fprintf(stderr, "VM: chkindex out of bounds: %d at offset %u in %s\n", idx, instrAddr, ctx->currentCodeName);
+                            abort();
+                        }
+                        break;
+                    }
+                    case BREAK_PUSHAF: {
+                        // Pop index and array ref, push array[index]
+                        RValue indexVal = stackPop(ctx);
+                        RValue arrayRef = stackPop(ctx);
+                        int32_t idx = RValue_toInt32(indexVal);
+                        RValue result = gmlArrayGet(ctx, &arrayRef, idx);
+                        stackPush(ctx, result);
+                        RValue_free(&indexVal);
+                        RValue_free(&arrayRef);
+                        break;
+                    }
+                    case BREAK_POPAF: {
+                        // Pop index, array ref, and value, store value at array[index]
+                        RValue indexVal = stackPop(ctx);
+                        RValue arrayRef = stackPop(ctx);
+                        RValue value = stackPop(ctx);
+                        int32_t idx = RValue_toInt32(indexVal);
+                        gmlArraySet(ctx, &arrayRef, idx, value);
+                        RValue_free(&indexVal);
+                        RValue_free(&arrayRef);
+                        // Don't free value - arrayMapSet takes ownership
+                        break;
+                    }
+                    case BREAK_PUSHAC: {
+                        // Pop index and array ref, push sub-array ref (intermediate dimension)
+                        // For multi-dimensional arrays like arr[i][j], pushac handles the intermediate [i]
+                        // and returns a reference to the sub-array at that index
+                        RValue indexVal = stackPop(ctx);
+                        RValue arrayRef = stackPop(ctx);
+                        int32_t idx = RValue_toInt32(indexVal);
+                        // Read the element - if it's itself a GML array ref, push it; otherwise wrap it
+                        RValue element = gmlArrayGet(ctx, &arrayRef, idx);
+                        if (element.type == RVALUE_GML_ARRAY) {
+                            stackPush(ctx, element);
+                        } else {
+                            // The element should be an array ref for multi-dimensional access
+                            // If not, this is a 1D array being accessed with multi-dim syntax - treat as error
+                            fprintf(stderr, "VM: pushac expected array ref at index %d but got type %d at offset %u in %s\n", idx, element.type, instrAddr, ctx->currentCodeName);
+                            abort();
+                        }
+                        RValue_free(&indexVal);
+                        RValue_free(&arrayRef);
+                        break;
+                    }
+                    case BREAK_SETOWNER: {
+                        // Copy-on-write owner tracking - just pop and discard (we don't implement CoW)
+                        RValue value = stackPop(ctx);
+                        RValue_free(&value);
+                        break;
+                    }
+                    case BREAK_ISSTATICOK: {
+                        // Push bool: has this function's static block already run?
+                        bool initialized = ctx->staticInitialized[ctx->currentCodeIndex];
+                        stackPush(ctx, RValue_makeBool(initialized));
+                        break;
+                    }
+                    case BREAK_SETSTATIC: {
+                        // Mark current function's static as initialized
+                        ctx->staticInitialized[ctx->currentCodeIndex] = true;
+                        break;
+                    }
+                    case BREAK_SAVEAREF: {
+                        // Save top-of-stack array ref for compound assignment on multi-dim arrays
+                        RValue_free(&ctx->savedArrayRef);
+                        ctx->savedArrayRef = *stackPeek(ctx); // non-owning copy (GML array refs have no owned resources)
+                        ctx->hasSavedArrayRef = true;
+                        break;
+                    }
+                    case BREAK_RESTOREAREF: {
+                        // Push the previously saved array ref back onto the stack
+                        require(ctx->hasSavedArrayRef);
+                        stackPush(ctx, ctx->savedArrayRef);
+                        ctx->hasSavedArrayRef = false;
+                        break;
+                    }
+                    default:
+                        fprintf(stderr, "VM: Unknown BREAK sub-opcode %d at offset %u in %s\n", breakType, instrAddr, ctx->currentCodeName);
+                        abort();
                 }
                 break;
+            }
 
             default:
                 fprintf(stderr, "VM: Unknown opcode 0x%02X at offset %u\n", opcode, instrAddr);
@@ -2066,6 +2239,16 @@ VMContext* VM_create(DataWin* dataWin) {
     ctx->globalArrayMap = nullptr;
     ctx->localArrayMap = nullptr;
     ctx->globalArrayVarTracker = nullptr;
+    ctx->currentCodeIndex = -1;
+
+    // V17+ static initialization tracking
+    if (17 <= dataWin->gen8.bytecodeVersion) {
+        ctx->staticInitialized = safeCalloc(dataWin->code.count, sizeof(bool));
+    } else {
+        ctx->staticInitialized = nullptr;
+    }
+    ctx->savedArrayRef = RValue_makeUndefined();
+    ctx->hasSavedArrayRef = false;
 
     // Find the varID for "creator" self variable (used by instance_create)
     ctx->creatorVarID = -1;
@@ -2225,6 +2408,7 @@ RValue VM_executeCode(VMContext* ctx, int32_t codeIndex) {
     ctx->ip = code->offset;
     ctx->codeEnd = code->length;
     ctx->currentCodeName = code->name;
+    ctx->currentCodeIndex = codeIndex;
 
     // Resolve CodeLocals for local variable slot mapping
     ctx->currentCodeLocals = resolveCodeLocals(ctx, code->name);
@@ -2277,6 +2461,7 @@ RValue VM_callCodeIndex(VMContext* ctx, int32_t codeIndex, RValue* args, int32_t
         .savedCodeLocals = ctx->currentCodeLocals,
         .savedScriptArgs = ctx->scriptArgs,
         .savedScriptArgCount = ctx->scriptArgCount,
+        .savedCurrentCodeIndex = ctx->currentCodeIndex,
         .parent = ctx->callStack,
     };
     ctx->callStack = &frame;
@@ -2287,6 +2472,7 @@ RValue VM_callCodeIndex(VMContext* ctx, int32_t codeIndex, RValue* args, int32_t
     ctx->ip = code->offset;
     ctx->codeEnd = code->length;
     ctx->currentCodeName = code->name;
+    ctx->currentCodeIndex = codeIndex;
     ctx->currentCodeLocals = resolveCodeLocals(ctx, code->name);
     ctx->localArrayMap = nullptr;
 
@@ -2351,6 +2537,7 @@ RValue VM_callCodeIndex(VMContext* ctx, int32_t codeIndex, RValue* args, int32_t
     ctx->scriptArgs = saved->savedScriptArgs;
     ctx->scriptArgCount = saved->savedScriptArgCount;
     ctx->currentCodeName = saved->savedCodeName;
+    ctx->currentCodeIndex = saved->savedCurrentCodeIndex;
     ctx->callStack = saved->parent;
     ctx->callDepth--;
 
@@ -2712,11 +2899,30 @@ static void formatInstruction(VMContext* ctx, const uint8_t* bytecodeBase, uint3
             snprintf(commentStr, commentSize, "// pops: [value]");
             break;
 
-        // Debug break
-        case OP_BREAK:
-            snprintf(opcodeStr, opcodeSize, "Break.%c", gmlTypeChar(type1));
-            snprintf(operandStr, operandSize, "%d", (int32_t) instType);
+        // Break (extended opcodes in V17+)
+        case OP_BREAK: {
+            int16_t breakType = (int16_t) instType;
+            const char* mnemonic;
+            switch (breakType) {
+                case BREAK_CHKINDEX:    mnemonic = "chkindex"; break;
+                case BREAK_PUSHAF:      mnemonic = "pushaf"; break;
+                case BREAK_POPAF:       mnemonic = "popaf"; break;
+                case BREAK_PUSHAC:      mnemonic = "pushac"; break;
+                case BREAK_SETOWNER:    mnemonic = "setowner"; break;
+                case BREAK_ISSTATICOK:  mnemonic = "isstaticok"; break;
+                case BREAK_SETSTATIC:   mnemonic = "setstatic"; break;
+                case BREAK_SAVEAREF:    mnemonic = "savearef"; break;
+                case BREAK_RESTOREAREF: mnemonic = "restorearef"; break;
+                default:                mnemonic = nullptr; break;
+            }
+            if (mnemonic != nullptr) {
+                snprintf(opcodeStr, opcodeSize, "%s.%c", mnemonic, gmlTypeChar(type1));
+            } else {
+                snprintf(opcodeStr, opcodeSize, "Break.%c", gmlTypeChar(type1));
+                snprintf(operandStr, operandSize, "%d", (int32_t) breakType);
+            }
             break;
+        }
 
         default:
             snprintf(opcodeStr, opcodeSize, "??? (0x%02X)", opcode);
@@ -2939,6 +3145,10 @@ void VM_free(VMContext* ctx) {
     // Free builtin map
     shfree(ctx->builtinMap);
     ctx->registeredBuiltinFunctions = false;
+
+    // Free V17+ static tracking
+    free(ctx->staticInitialized);
+    RValue_free(&ctx->savedArrayRef);
 
 #ifndef PLATFORM_PS2
     free(ctx);

@@ -2478,7 +2478,7 @@ VMContext* VM_create(DataWin* dataWin) {
             CodeLocals* cl = &dataWin->func.codeLocals[clIdx];
             LocalSlotEntry* slotMap = nullptr;
             repeat(cl->localVarCount, i) {
-                hmput(slotMap, (int32_t) cl->locals[i].index, (uint32_t) i);
+                hmput(slotMap, (int32_t) cl->locals[i].varID, (uint32_t) i);
             }
             ctx->codeLocalsSlotMaps[clIdx] = slotMap;
         }
@@ -3182,7 +3182,7 @@ void VM_disassemble(VMContext* ctx, int32_t codeIndex) {
         printf("Locals:");
         repeat(locals->localVarCount, i) {
             if (i > 0) printf(",");
-            printf(" [%u] %s", locals->locals[i].index, locals->locals[i].name);
+            printf(" [%u] %s", locals->locals[i].varID, locals->locals[i].name);
         }
         printf("\n");
     }

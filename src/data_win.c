@@ -1408,7 +1408,7 @@ static void parseFUNC(BinaryReader* reader, DataWin* dw) {
             if (cl->localVarCount > 0) {
                 cl->locals = safeMalloc(cl->localVarCount * sizeof(LocalVar));
                 repeat(cl->localVarCount, j) {
-                    cl->locals[j].index = BinaryReader_readUint32(reader);
+                    cl->locals[j].varID = BinaryReader_readUint32(reader);
                     cl->locals[j].name = readStringPtr(reader, dw);
                 }
             } else {

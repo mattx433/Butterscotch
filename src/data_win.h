@@ -680,7 +680,9 @@ typedef struct {
 } Function;
 
 typedef struct {
-    uint32_t index;
+    // UndertaleModTool calls this field "Index", but that's because that's how it seemingly worked in pre-bytecode version 17
+    // After bytecode version 17+, this has shown that this is actually the varID of the local variable (it matches the Variable.varID)
+    uint32_t varID;
     const char* name;
 } LocalVar;
 

@@ -1405,6 +1405,59 @@ static RValue builtinCameraSetViewPos(VMContext* ctx, RValue* args, int32_t argC
     return RValue_makeUndefined();
 }
 
+static RValue builtinCameraGetViewTarget(VMContext* ctx, RValue* args, int32_t argCount) {
+    if (1 > argCount) return RValue_makeReal(-1);
+    Runner* runner = requireNotNullMessage(ctx->runner, "VM: camera_get_view_target called but no runner!");
+    int32_t cameraId = RValue_toInt32(args[0]);
+    if (cameraId >= 0 && MAX_VIEWS > cameraId) {
+        return RValue_makeReal((double) runner->currentRoom->views[cameraId].objectId);
+    }
+    return RValue_makeReal(-1);
+}
+
+static RValue builtinCameraSetViewTarget(VMContext* ctx, RValue* args, int32_t argCount) {
+    if (2 > argCount) return RValue_makeUndefined();
+    Runner* runner = requireNotNullMessage(ctx->runner, "VM: camera_set_view_target called but no runner!");
+    int32_t cameraId = RValue_toInt32(args[0]);
+    int32_t objectId = RValue_toInt32(args[1]);
+    if (cameraId >= 0 && MAX_VIEWS > cameraId) {
+        runner->currentRoom->views[cameraId].objectId = objectId;
+    }
+    return RValue_makeUndefined();
+}
+
+static RValue cameraGetViewBorder(VMContext* ctx, RValue* args, int32_t argCount, bool wantY) {
+    if (1 > argCount) return RValue_makeReal(-1);
+    Runner* runner = requireNotNullMessage(ctx->runner, "VM: camera_get_view_border called but no runner!");
+    int32_t cameraId = RValue_toInt32(args[0]);
+    if (cameraId >= 0 && MAX_VIEWS > cameraId) {
+        RoomView* v = &runner->currentRoom->views[cameraId];
+        return RValue_makeReal((double) (wantY ? v->borderY : v->borderX));
+    }
+    return RValue_makeReal(-1);
+}
+
+static RValue builtinCameraGetViewBorderX(VMContext* ctx, RValue* args, int32_t argCount) {
+    return cameraGetViewBorder(ctx, args, argCount, false);
+}
+
+static RValue builtinCameraGetViewBorderY(VMContext* ctx, RValue* args, int32_t argCount) {
+    return cameraGetViewBorder(ctx, args, argCount, true);
+}
+
+static RValue builtinCameraSetViewBorder(VMContext* ctx, RValue* args, int32_t argCount) {
+    if (3 > argCount) return RValue_makeUndefined();
+    Runner* runner = requireNotNullMessage(ctx->runner, "VM: camera_set_view_border called but no runner!");
+    int32_t cameraId = RValue_toInt32(args[0]);
+    int32_t bx = RValue_toInt32(args[1]);
+    int32_t by = RValue_toInt32(args[2]);
+    if (cameraId >= 0 && MAX_VIEWS > cameraId) {
+        runner->currentRoom->views[cameraId].borderX = (uint32_t) bx;
+        runner->currentRoom->views[cameraId].borderY = (uint32_t) by;
+    }
+    return RValue_makeUndefined();
+}
+
 // ===[ VARIABLE FUNCTIONS ]===
 
 static RValue builtinVariableGlobalExists(VMContext* ctx, RValue* args, int32_t argCount) {
@@ -5947,6 +6000,11 @@ void VMBuiltins_registerAll(VMContext* ctx) {
     VM_registerBuiltin(ctx, "camera_get_view_width", builtinCameraGetViewWidth);
     VM_registerBuiltin(ctx, "camera_get_view_height", builtinCameraGetViewHeight);
     VM_registerBuiltin(ctx, "camera_set_view_pos", builtinCameraSetViewPos);
+    VM_registerBuiltin(ctx, "camera_get_view_target", builtinCameraGetViewTarget);
+    VM_registerBuiltin(ctx, "camera_set_view_target", builtinCameraSetViewTarget);
+    VM_registerBuiltin(ctx, "camera_get_view_border_x", builtinCameraGetViewBorderX);
+    VM_registerBuiltin(ctx, "camera_get_view_border_y", builtinCameraGetViewBorderY);
+    VM_registerBuiltin(ctx, "camera_set_view_border", builtinCameraSetViewBorder);
 
     // Variables
     VM_registerBuiltin(ctx, "variable_global_exists", builtinVariableGlobalExists);

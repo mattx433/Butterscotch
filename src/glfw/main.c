@@ -361,6 +361,12 @@ static void keyCallback(GLFWwindow* window, int key, int scancode, int action, i
     // GLFW_REPEAT is ignored (GML doesn't use key repeat)
 }
 
+static void characterCallback(GLFWwindow* window, unsigned int codepoint) {
+    Runner* runner = (Runner*) glfwGetWindowUserPointer(window);
+    if (InputRecording_isPlaybackActive(globalInputRecording)) return;
+    RunnerKeyboard_onCharacter(runner->keyboard, codepoint);
+}
+
 void saveInputRecording() {
     // Save input recording if active, then free
     if (globalInputRecording != nullptr) {
@@ -580,6 +586,7 @@ int main(int argc, char* argv[]) {
     // Set up keyboard input
     glfwSetWindowUserPointer(window, runner);
     glfwSetKeyCallback(window, keyCallback);
+    glfwSetCharCallback(window, characterCallback);
 
 #ifndef _WIN32
     struct sigaction sa = { .sa_handler = onCrashSignal };

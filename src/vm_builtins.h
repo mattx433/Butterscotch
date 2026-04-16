@@ -129,6 +129,7 @@ typedef enum {
 
     // Keyboard
     BUILTIN_VAR_KEYBOARD_KEY,
+    BUILTIN_VAR_KEYBOARD_LASTCHAR,
     BUILTIN_VAR_KEYBOARD_LASTKEY,
 
     // Surfaces

@@ -216,6 +216,7 @@ int16_t VMBuiltins_resolveBuiltinVarId(const char* name) {
 
     // Keyboard
     if (strcmp(name, "keyboard_key") == 0) return BUILTIN_VAR_KEYBOARD_KEY;
+    if (strcmp(name, "keyboard_lastchar") == 0) return BUILTIN_VAR_KEYBOARD_LASTCHAR;
     if (strcmp(name, "keyboard_lastkey") == 0) return BUILTIN_VAR_KEYBOARD_LASTKEY;
 
     // Surfaces
@@ -520,6 +521,7 @@ RValue VMBuiltins_getVariable(VMContext* ctx, int16_t builtinVarId, const char* 
 
     // Keyboard variables
     if (builtinVarId == BUILTIN_VAR_KEYBOARD_KEY) return RValue_makeReal((GMLReal) runner->keyboard->lastKey);
+    if (builtinVarId == BUILTIN_VAR_KEYBOARD_LASTCHAR) return RValue_makeString(runner->keyboard->lastChar);
     if (builtinVarId == BUILTIN_VAR_KEYBOARD_LASTKEY) return RValue_makeReal((GMLReal) runner->keyboard->lastKey);
 
     // Surfaces
@@ -644,6 +646,10 @@ void VMBuiltins_setVariable(VMContext* ctx, int16_t builtinVarId, const char* na
         runner->keyboard->lastKey = RValue_toInt32(val);
         return;
     }
+    if (builtinVarId == BUILTIN_VAR_KEYBOARD_LASTCHAR) {
+        runner->keyboard->lastChar[0] = val.string[0];
+        return;
+    }
     if (builtinVarId == BUILTIN_VAR_KEYBOARD_LASTKEY) {
         runner->keyboard->lastKey = RValue_toInt32(val);
         return;
@@ -692,7 +698,7 @@ void VMBuiltins_setVariable(VMContext* ctx, int16_t builtinVarId, const char* na
         builtinVarId == BUILTIN_VAR_ID || builtinVarId == BUILTIN_VAR_OBJECT_INDEX ||
         builtinVarId == BUILTIN_VAR_CURRENT_TIME ||
         builtinVarId == BUILTIN_VAR_VIEW_CURRENT || builtinVarId == BUILTIN_VAR_PATH_INDEX ||
-        builtinVarId == BUILTIN_VAR_DEBUG_MODE || builtinVarId == BUILTIN_VAR_ROOM_FIRST || 
+        builtinVarId == BUILTIN_VAR_DEBUG_MODE || builtinVarId == BUILTIN_VAR_ROOM_FIRST ||
         (builtinVarId >= BUILTIN_VAR_BUFFER_FIXED && BUILTIN_VAR_BUFFER_SEEK_END >= builtinVarId)) {
         fprintf(stderr, "VM: Warning - attempted write to read-only built-in '%s'\n", name);
         return;

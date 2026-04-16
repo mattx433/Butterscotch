@@ -173,6 +173,7 @@ typedef enum {
 
     // Other
     BUILTIN_VAR_FPS,
+    BUILTIN_VAR_DEBUG_MODE,
 } BuiltinVarId;
 
 void VMBuiltins_registerAll(VMContext* ctx, bool isGMS2);

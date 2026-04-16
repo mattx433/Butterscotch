@@ -380,6 +380,14 @@ static ArrayAccess popArrayAccess(VMContext* ctx, uint32_t varRef) {
         int32_t instanceType = RValue_toInt32(instTypeVal);
         RValue_free(&instTypeVal);
 
+        // BC17: if instanceType is -9 (INSTANCE_STACKTOP), the actual instance is the next stack item.
+        // This is used for chained access like `command_actor[i].specialsprite[arg]` where the array variable's owning instance is resolved from a computed value on the stack.
+        if (instanceType == INSTANCE_STACKTOP) {
+            RValue realInst = stackPop(ctx);
+            instanceType = RValue_toInt32(realInst);
+            RValue_free(&realInst);
+        }
+
         return (ArrayAccess){ .arrayIndex = arrayIndex, .instanceType = instanceType, .isArray = true, .hasInstanceType = true };
     }
     if (varType == VARTYPE_STACKTOP) {
@@ -1588,6 +1596,14 @@ static void handleCmp(VMContext* ctx, uint32_t instr) {
             case CMP_GTE: result = cmp >= 0; break;
             case CMP_GT:  result = cmp > 0; break;
             default: result = false; break;
+        }
+    } else if ((a.type == RVALUE_STRING) != (b.type == RVALUE_STRING)) {
+        // Type mismatch: one side is a string, the other is not.
+        // Because they will never be equal, we'll always return false.
+        switch (cmpKind) {
+            case CMP_EQ:  result = false; break;
+            case CMP_NEQ: result = true;  break;
+            default:      result = false; break;
         }
     } else {
         GMLReal da = RValue_toReal(a);

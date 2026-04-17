@@ -80,9 +80,9 @@ static RValue RValue_makeInt64(int64_t val) {
     // Values that don't fit in int32 get promoted to real instead of clamped, because clamping to INT32_MIN causes arithmetic overflow bugs
     // (example: Undertale's mercymod = -99999999999999 in the Asriel fight)
     if (val > INT32_MAX || INT32_MIN > val) {
-        return (RValue){ .real = (GMLReal) val, .type = RVALUE_REAL RVALUE_INIT_GMLTYPE(GML_TYPE_DOUBLE) };
+        return (RValue){ .real = (GMLReal) val, .type = RVALUE_REAL, RVALUE_INIT_GMLTYPE(GML_TYPE_DOUBLE) };
     } else {
-        return (RValue){ .int32 = (int32_t) val, .type = RVALUE_INT32 RVALUE_INIT_GMLTYPE(GML_TYPE_INT32) };
+        return (RValue){ .int32 = (int32_t) val, .type = RVALUE_INT32, RVALUE_INIT_GMLTYPE(GML_TYPE_INT32) };
     }
 #else
     return (RValue){ .int64 = val, .type = RVALUE_INT64, RVALUE_INIT_GMLTYPE(GML_TYPE_INT64) };

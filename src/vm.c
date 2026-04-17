@@ -27,6 +27,28 @@ static bool shouldTraceStack(VMContext* ctx) {
     if (shlen(ctx->stackToBeTraced) == 0) return false;
     return shgeti(ctx->stackToBeTraced, "*") != -1 || shgeti(ctx->stackToBeTraced, ctx->currentCodeName) != -1;
 }
+
+// Returns a heap-allocated "[elem0, elem1, ..., elemN]" string for the current stack contents (bottom -> top). Caller frees.
+static char* formatStackContents(VMContext* ctx) {
+    size_t cap = 256;
+    size_t len = 1;
+    char* buf = safeCalloc(cap, sizeof(char));
+    buf[0] = '[';
+    repeat(ctx->stack.top, si) {
+        char* typed = RValue_toStringTyped(ctx->stack.slots[si]);
+        const char* sep = (si > 0) ? ", " : "";
+        size_t needed = strlen(sep) + strlen(typed) + 2;
+        if (len + needed > cap) {
+            cap = (len + needed) * 2;
+            buf = realloc(buf, cap);
+        }
+        len += sprintf(buf + len, "%s%s", sep, typed);
+        free(typed);
+    }
+    buf[len++] = ']';
+    buf[len] = '\0';
+    return buf;
+}
 #endif
 
 // Returns the native byte size of a GML data type on the runner's stack.
@@ -49,8 +71,12 @@ static void stackPush(VMContext* ctx, RValue val) {
 #ifndef DISABLE_VM_TRACING
     if (shouldTraceStack(ctx)) {
         char* valStr = RValue_toStringTyped(val);
-        fprintf(stderr, "VM: [%s] PUSH %s [stack=%d -> %d]\n", ctx->currentCodeName, valStr, ctx->stack.top, ctx->stack.top + 1);
+        ctx->stack.slots[ctx->stack.top++] = val;
+        char* stackBuf = formatStackContents(ctx);
+        fprintf(stderr, "VM: [%s] PUSH %s [stack=%d -> %d] %s\n", ctx->currentCodeName, valStr, ctx->stack.top - 1, ctx->stack.top, stackBuf);
+        free(stackBuf);
         free(valStr);
+        return;
     }
 #endif
     ctx->stack.slots[ctx->stack.top++] = val;
@@ -67,7 +93,9 @@ static RValue stackPop(VMContext* ctx) {
 #ifndef DISABLE_VM_TRACING
     if (shouldTraceStack(ctx)) {
         char* valStr = RValue_toStringTyped(val);
-        fprintf(stderr, "VM: [%s] POP  %s [stack=%d -> %d]\n", ctx->currentCodeName, valStr, ctx->stack.top + 1, ctx->stack.top);
+        char* stackBuf = formatStackContents(ctx);
+        fprintf(stderr, "VM: [%s] POP  %s [stack=%d -> %d] %s\n", ctx->currentCodeName, valStr, ctx->stack.top + 1, ctx->stack.top, stackBuf);
+        free(stackBuf);
         free(valStr);
     }
 #endif
@@ -2216,24 +2244,7 @@ static RValue executeLoop(VMContext* ctx) {
                 char opcodeStr[32], operandStr[256] = "", commentStr[128] = "";
                 formatInstruction(ctx, ctx->bytecodeBase, instrAddr, instr, extraData, opcodeStr, sizeof(opcodeStr), operandStr, sizeof(operandStr), commentStr, sizeof(commentStr));
 
-                // Build typed stack contents string (bottom of the stack -> top of the stack)
-                size_t stackCap = 256;
-                size_t stackLen = 1;
-                char* stackBuf = safeCalloc(stackCap, sizeof(char));
-                stackBuf[0] = '[';
-                repeat(ctx->stack.top, si) {
-                    char* typed = RValue_toStringTyped(ctx->stack.slots[si]);
-                    const char* separator = (si > 0) ? ", " : "";
-                    size_t needed = strlen(separator) + strlen(typed) + 2; // +2 for "]" and null
-                    if (stackLen + needed > stackCap) {
-                        stackCap = (stackLen + needed) * 2;
-                        stackBuf = realloc(stackBuf, stackCap);
-                    }
-                    stackLen += sprintf(stackBuf + stackLen, "%s%s", separator, typed);
-                    free(typed);
-                }
-                stackBuf[stackLen++] = ']';
-                stackBuf[stackLen] = '\0';
+                char* stackBuf = formatStackContents(ctx);
 
                 if (operandStr[0] != '\0') {
                     fprintf(stderr, "VM: [%s] @%04X [0x%08X] %s %s [stack=%d] %s\n", ctx->currentCodeName, instrAddr, instr, opcodeStr, operandStr, ctx->stack.top, stackBuf);

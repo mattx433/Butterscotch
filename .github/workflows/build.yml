@@ -190,7 +190,10 @@ jobs:
           echo "date=$(git log -1 --format=%cd --date=format:'%Y-%m-%d %H:%M:%S')" >> $GITHUB_OUTPUT
 
       - name: Configure
-        run: cmake -B build -DCMAKE_TOOLCHAIN_FILE=$PS2SDK/ps2dev.cmake -DPLATFORM=ps2 ${{ matrix.extra_flags }} -DCMAKE_BUILD_TYPE=Release "-DBUTTERSCOTCH_COMMIT_HASH=${{ steps.commit-info.outputs.hash }}" "-DBUTTERSCOTCH_COMMIT_DATE=${{ steps.commit-info.outputs.date }}"
+        run: |
+          mkdir -p build
+          export CFLAGS="-fopt-info-inline-optimized=$PWD/build/inline_report.txt"
+          cmake -B build -DCMAKE_TOOLCHAIN_FILE=$PS2SDK/ps2dev.cmake -DPLATFORM=ps2 ${{ matrix.extra_flags }} -DCMAKE_BUILD_TYPE=Release "-DBUTTERSCOTCH_COMMIT_HASH=${{ steps.commit-info.outputs.hash }}" "-DBUTTERSCOTCH_COMMIT_DATE=${{ steps.commit-info.outputs.date }}"
 
       - name: Build
         run: |
@@ -221,6 +224,45 @@ jobs:
           echo "| Function | Size | Limit | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|------|-------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| \`executeLoop\` | $SIZE_DEC bytes | $LIMIT bytes (16 KB) | $((LIMIT - SIZE_DEC)) bytes remaining |" >> $GITHUB_STEP_SUMMARY
+
+      - name: Report executeLoop inlining
+        run: |
+          REPORT=build/inline_report.txt
+          if [ ! -s "$REPORT" ]; then
+            echo "::warning::No inline report produced at $REPORT"
+            exit 0
+          fi
+          # Extract callees that GCC reported as inlined into executeLoop
+          INLINED=$(grep -E "Inlin(ed|ing) .* into executeLoop" "$REPORT" \
+            | awk '{for(i=1;i<=NF;i++) if($i=="into" && $(i+1) ~ /^executeLoop/) {name=$(i-1); sub(/\/[0-9]+$/,"",name); print name}}' \
+            | sort -u)
+          # Cross-check: jal targets still present in the compiled executeLoop
+          NOT_INLINED=$(mips64r5900el-ps2-elf-objdump -d --disassemble=executeLoop build/butterscotch.elf 2>/dev/null \
+            | grep -oE "jal[[:space:]]+[0-9a-f]+ <[^>]+>" \
+            | sed -E 's/.*<([^>]+)>/\1/' \
+            | sort -u)
+          INLINED_COUNT=$(printf "%s\n" "$INLINED" | grep -c . || true)
+          NOT_INLINED_COUNT=$(printf "%s\n" "$NOT_INLINED" | grep -c . || true)
+          {
+            echo ""
+            echo "### \`executeLoop\` inlining report"
+            echo ""
+            echo "<details><summary>Inlined into <code>executeLoop</code> ($INLINED_COUNT callees, per GCC <code>-fopt-info-inline-optimized</code>)</summary>"
+            echo ""
+            echo '```'
+            printf "%s\n" "$INLINED"
+            echo '```'
+            echo ""
+            echo "</details>"
+            echo ""
+            echo "<details><summary>Still called via <code>jal</code> from <code>executeLoop</code> ($NOT_INLINED_COUNT symbols, per <code>objdump</code>)</summary>"
+            echo ""
+            echo '```'
+            printf "%s\n" "$NOT_INLINED"
+            echo '```'
+            echo ""
+            echo "</details>"
+          } >> $GITHUB_STEP_SUMMARY
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

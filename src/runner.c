@@ -1869,10 +1869,10 @@ void Runner_dumpState(Runner* runner) {
 
             if (val.type == RVALUE_ARRAY && val.array != nullptr) {
                 if (!hasSelfArrays) { printf("  Self Arrays:\n"); hasSelfArrays = true; }
-                repeat(val.array->length, ai) {
-                    RValue inner = val.array->data[ai];
-                    if (inner.type == RVALUE_UNDEFINED) continue;
-                    char* innerStr = RValue_toStringFancy(inner);
+                repeat(GMLArray_length1D(val.array), ai) {
+                    RValue* cell = GMLArray_slot(val.array, ai);
+                    if (cell == nullptr || cell->type == RVALUE_UNDEFINED) continue;
+                    char* innerStr = RValue_toStringFancy(*cell);
                     printf("    %s[%d] = %s\n", varName, (int) ai, innerStr);
                     free(innerStr);
                 }
@@ -1906,10 +1906,10 @@ void Runner_dumpState(Runner* runner) {
         if ((uint32_t) var->varID >= vm->globalVarCount) continue;
         RValue val = vm->globalVars[var->varID];
         if (val.type != RVALUE_ARRAY || val.array == nullptr) continue;
-        repeat(val.array->length, ai) {
-            RValue inner = val.array->data[ai];
-            if (inner.type == RVALUE_UNDEFINED) continue;
-            char* innerStr = RValue_toStringFancy(inner);
+        repeat(GMLArray_length1D(val.array), ai) {
+            RValue* cell = GMLArray_slot(val.array, ai);
+            if (cell == nullptr || cell->type == RVALUE_UNDEFINED) continue;
+            char* innerStr = RValue_toStringFancy(*cell);
             printf("  %s[%d] = %s\n", var->name, (int) ai, innerStr);
             free(innerStr);
         }
@@ -1946,8 +1946,9 @@ static void writeRValueJson(JsonWriter* w, RValue val) {
             // Render arrays as a JSON array. Skips RVALUE_UNDEFINED entries (they read as 0/null anyway).
             JsonWriter_beginArray(w);
             if (val.array != nullptr) {
-                repeat(val.array->length, ai) {
-                    writeRValueJson(w, val.array->data[ai]);
+                repeat(GMLArray_length1D(val.array), ai) {
+                    RValue* cell = GMLArray_slot(val.array, ai);
+                    writeRValueJson(w, cell != nullptr ? *cell : (RValue){ .type = RVALUE_UNDEFINED });
                 }
             }
             JsonWriter_endArray(w);

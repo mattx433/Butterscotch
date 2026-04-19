@@ -255,34 +255,34 @@ static RValue VM_arrayReadAt(RValue* slot, int32_t index) {
     if (slot == nullptr || slot->type != RVALUE_ARRAY || slot->array == nullptr) {
         return (RValue){ .type = RVALUE_UNDEFINED };
     }
-    GMLArray* arr = slot->array;
-    if (0 > index || index >= arr->length) {
+    RValue* cell = GMLArray_slot(slot->array, index);
+    if (cell == nullptr) {
         return (RValue){ .type = RVALUE_UNDEFINED };
     }
-    RValue result = arr->data[index];
+    RValue result = *cell;
     result.ownsString = false;
     return result;
 }
 
-// Copies "val" into arr->data[index]: dup string buffers, incRef arrays. Caller retains "val".
-static void storeIntoArraySlot(RValue* slot, int32_t index, RValue val) {
+// Copies "val" into *slot: dup string buffers, incRef arrays. Caller retains "val".
+static void storeIntoArraySlot(RValue* slot, RValue val) {
     // Free whatever was there (decRefs owned arrays, frees owned strings).
-    RValue_free(&slot[index]);
+    RValue_free(slot);
     if (val.type == RVALUE_STRING && val.string != nullptr) {
-        slot[index] = RValue_makeOwnedString(safeStrdup(val.string));
+        *slot = RValue_makeOwnedString(safeStrdup(val.string));
     } else if (val.type == RVALUE_ARRAY && val.array != nullptr) {
         GMLArray_incRef(val.array);
         val.ownsString = true;
-        slot[index] = val;
+        *slot = val;
 #if IS_BC17_OR_HIGHER_ENABLED
     } else if (val.type == RVALUE_METHOD && val.method != nullptr) {
         GMLMethod_incRef(val.method);
         val.ownsString = true;
-        slot[index] = val;
+        *slot = val;
 #endif
     } else {
         val.ownsString = false;
-        slot[index] = val;
+        *slot = val;
     }
 }
 
@@ -307,7 +307,7 @@ static GMLArray* VM_arrayWriteAt(VMContext* ctx, RValue* slot, int32_t index, RV
         fresh->owner = intendedOwner;
         *slot = RValue_makeArray(fresh);
         GMLArray_growTo(fresh, index + 1);
-        storeIntoArraySlot(fresh->data, index, val);
+        storeIntoArraySlot(GMLArray_slot(fresh, index), val);
         return fresh;
     }
 
@@ -336,7 +336,7 @@ static GMLArray* VM_arrayWriteAt(VMContext* ctx, RValue* slot, int32_t index, RV
 
     // Case 3: grow if needed, then write.
     GMLArray_growTo(arr, index + 1);
-    storeIntoArraySlot(arr->data, index, val);
+    storeIntoArraySlot(GMLArray_slot(arr, index), val);
     return arr;
 }
 
@@ -354,7 +354,7 @@ void VM_arraySet(MAYBE_UNUSED VMContext* ctx, RValue* arrayRef, int32_t index, R
     require(arrayRef != nullptr && arrayRef->type == RVALUE_ARRAY && arrayRef->array != nullptr);
     GMLArray* arr = arrayRef->array;
     GMLArray_growTo(arr, index + 1);
-    storeIntoArraySlot(arr->data, index, val);
+    storeIntoArraySlot(GMLArray_slot(arr, index), val);
 }
 
 // ===[ Trace Helpers ]===
@@ -1096,15 +1096,16 @@ static void handlePush(VMContext* ctx, uint32_t instr, const uint8_t* extraData)
                 }
                 GMLArray* top = slot->array;
                 GMLArray_growTo(top, firstIndex + 1);
+                RValue* topSlot = GMLArray_slot(top, firstIndex);
                 // Materialise the sub-array at [firstIndex] if it's not already an array.
-                if (top->data[firstIndex].type != RVALUE_ARRAY || top->data[firstIndex].array == nullptr) {
-                    RValue_free(&top->data[firstIndex]);
+                if (topSlot->type != RVALUE_ARRAY || topSlot->array == nullptr) {
+                    RValue_free(topSlot);
                     GMLArray* sub = GMLArray_create(0);
                     sub->owner = top->owner;
-                    top->data[firstIndex] = (RValue){ .array = sub, .type = RVALUE_ARRAY, .ownsString = true, RVALUE_INIT_GMLTYPE(GML_TYPE_VARIABLE) };
+                    *topSlot = (RValue){ .array = sub, .type = RVALUE_ARRAY, .ownsString = true, RVALUE_INIT_GMLTYPE(GML_TYPE_VARIABLE) };
                 }
                 // Push a weak ref to the sub-array — short-lived, consumed by the next BREAK op.
-                stackPush(ctx, RValue_makeArrayWeak(top->data[firstIndex].array));
+                stackPush(ctx, RValue_makeArrayWeak(topSlot->array));
             } else
 #endif
             {
@@ -2243,8 +2244,9 @@ static void handleBreakPushAF(VMContext* ctx) {
     int32_t idx = stackPopInt32(ctx);
     RValue arrayRef = stackPop(ctx);
     RValue result;
-    if (arrayRef.type == RVALUE_ARRAY && arrayRef.array != nullptr && idx >= 0 && idx < arrayRef.array->length) {
-        result = arrayRef.array->data[idx];
+    RValue* cell = arrayRef.type == RVALUE_ARRAY ? GMLArray_slot(arrayRef.array, idx) : nullptr;
+    if (cell != nullptr) {
+        result = *cell;
         result.ownsString = false; // weak view
     } else {
         result = (RValue){ .type = RVALUE_UNDEFINED };
@@ -2265,7 +2267,7 @@ static void handleBreakPopAF(VMContext* ctx) {
         GMLArray* arr = arrayRef.array;
         requireMessage(arr->refCount == 1 || arr->owner == ctx->currentArrayOwner, "BREAK_POPAF: Writing through shared/aliased array without prior CoW fork");
         GMLArray_growTo(arr, idx + 1);
-        storeIntoArraySlot(arr->data, idx, value);
+        storeIntoArraySlot(GMLArray_slot(arr, idx), value);
     }
     RValue_free(&arrayRef);
     RValue_free(&value);
@@ -2281,13 +2283,14 @@ static void handleBreakPushAC(VMContext* ctx, uint32_t instrAddr) {
     }
     GMLArray* parent = arrayRef.array;
     GMLArray_growTo(parent, idx + 1);
-    if (parent->data[idx].type != RVALUE_ARRAY || parent->data[idx].array == nullptr) {
-        RValue_free(&parent->data[idx]);
+    RValue* parentSlot = GMLArray_slot(parent, idx);
+    if (parentSlot->type != RVALUE_ARRAY || parentSlot->array == nullptr) {
+        RValue_free(parentSlot);
         GMLArray* sub = GMLArray_create(0);
         sub->owner = parent->owner;
-        parent->data[idx] = (RValue){ .array = sub, .type = RVALUE_ARRAY, .ownsString = true, RVALUE_INIT_GMLTYPE(GML_TYPE_VARIABLE) };
+        *parentSlot = (RValue){ .array = sub, .type = RVALUE_ARRAY, .ownsString = true, RVALUE_INIT_GMLTYPE(GML_TYPE_VARIABLE) };
     }
-    stackPush(ctx, RValue_makeArrayWeak(parent->data[idx].array));
+    stackPush(ctx, RValue_makeArrayWeak(parentSlot->array));
     RValue_free(&arrayRef);
 }
 

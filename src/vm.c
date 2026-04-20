@@ -2726,6 +2726,26 @@ static void setCurrentCodeLocals(VMContext* ctx, CodeLocals* codeLocals) {
     }
 }
 
+static uint32_t computeLocalsCount(VMContext* ctx) {
+    // CodeLocals is the authoritative source for local variable count (not code->localsCount).
+    // Array-valued locals now live inline in localVars[] as RVALUE_ARRAY entries, no side map.
+    // The slot map may have grown beyond CodeLocals->localVarCount due to prior runs that encountered array-only locals missing from CodeLocals, so take the larger of the two.
+    //
+    // For some reason in GameMaker: Studio 2.3+ some code doesn't have code locals, why?
+    // If they don't have code locals, then we'll just use 0 anyway...
+    uint32_t localsCount = 0;
+    if (ctx->currentCodeLocals != nullptr) {
+        localsCount = ctx->currentCodeLocals->localVarCount;
+        if (ctx->currentCodeLocalsSlotMap != nullptr) {
+            uint32_t mapSize = (uint32_t) hmlen(ctx->currentCodeLocalsSlotMap);
+            if (mapSize > localsCount) localsCount = mapSize;
+        }
+    }
+    if (localsCount == 0) localsCount = 1;
+    requireMessage(MAX_CODE_LOCALS >= localsCount, "Code has too many locals!");
+    return localsCount;
+}
+
 RValue VM_executeCode(VMContext* ctx, int32_t codeIndex) {
     require(codeIndex >= 0 && ctx->dataWin->code.count > (uint32_t) codeIndex);
     CodeEntry* code = &ctx->dataWin->code.entries[codeIndex];
@@ -2739,16 +2759,7 @@ RValue VM_executeCode(VMContext* ctx, int32_t codeIndex) {
     // Resolve CodeLocals for local variable slot mapping
     setCurrentCodeLocals(ctx, resolveCodeLocals(ctx, code->name));
 
-    // Allocate locals. CodeLocals is the authoritative source for local variable count (not code->localsCount).
-    // Array-valued locals now live inline in localVars[] as RVALUE_ARRAY entries — no side map.
-    // The slot map may have grown beyond CodeLocals->localVarCount due to prior runs that encountered array-only locals missing from CodeLocals, so take the larger of the two.
-    uint32_t localsCount = ctx->currentCodeLocals->localVarCount;
-    if (ctx->currentCodeLocalsSlotMap != nullptr) {
-        uint32_t mapSize = (uint32_t) hmlen(ctx->currentCodeLocalsSlotMap);
-        if (mapSize > localsCount) localsCount = mapSize;
-    }
-    if (localsCount == 0) localsCount = 1;
-    requireMessage(MAX_CODE_LOCALS >= localsCount, "Code has too many locals!");
+    uint32_t localsCount = computeLocalsCount(ctx);
     RValue localVars[MAX_CODE_LOCALS];
     ctx->localVars = localVars;
     ctx->localVarCount = localsCount;
@@ -2811,16 +2822,9 @@ RValue VM_callCodeIndex(VMContext* ctx, int32_t codeIndex, RValue* args, int32_t
     ctx->currentCodeIndex = codeIndex;
     setCurrentCodeLocals(ctx, resolveCodeLocals(ctx, code->name));
 
+    uint32_t localsCount = computeLocalsCount(ctx);
     // We use fixed-size arrays instead of VLAs because it seems that using multiple VLAs in a single function things get corrupted somehow?
     // So when you see this MAX_CODE_LOCALS and GML_MAX_ARGUMENTS, you can shake your fist in the air and say "damn you MIPS!!1"
-    // The slot map may have grown beyond CodeLocals->localVarCount due to prior runs that encountered array-only locals missing from CodeLocals, so take the larger of the two.
-    uint32_t localsCount = ctx->currentCodeLocals->localVarCount;
-    if (ctx->currentCodeLocalsSlotMap != nullptr) {
-        uint32_t mapSize = (uint32_t) hmlen(ctx->currentCodeLocalsSlotMap);
-        if (mapSize > localsCount) localsCount = mapSize;
-    }
-    if (localsCount == 0) localsCount = 1;
-    requireMessage(MAX_CODE_LOCALS >= localsCount, "Code has too many locals!");
     RValue localVars[MAX_CODE_LOCALS];
     ctx->localVars = localVars;
     ctx->localVarCount = localsCount;

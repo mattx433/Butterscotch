@@ -537,6 +537,14 @@ static RValue resolveVariableRead(VMContext* ctx, int32_t instanceType, uint32_t
         instanceType = access.instanceType;
     }
 
+    // BC17+: Push.v/Pop.v with instrInstanceType == -9 (STACKTOP) and VARTYPE_NORMAL means
+    // "the instance is on the stack" (e.g. `struct.field` after @@NewGMLObject@@). Pop it here.
+#if IS_BC17_OR_HIGHER_ENABLED
+    if (IS_BC17_OR_HIGHER(ctx) && !access.hasInstanceType && instanceType == INSTANCE_STACKTOP) {
+        instanceType = resolveInstanceStackTop(ctx);
+    }
+#endif
+
     // Resolve target instance for object/instance references (instanceType >= 0)
     Instance* targetInstance = (Instance*) ctx->currentInstance;
     if (instanceType >= 0) {
@@ -756,6 +764,14 @@ static void resolveVariableWrite(VMContext* ctx, int32_t instanceType, uint32_t 
     if (access.hasInstanceType) {
         instanceType = access.instanceType;
     }
+
+    // BC17+: Pop.v with instrInstanceType == -9 (STACKTOP) and VARTYPE_NORMAL means
+    // "the instance is on the stack" (e.g. `struct.field =` after @@NewGMLObject@@). Pop it here.
+#if IS_BC17_OR_HIGHER_ENABLED
+    if (IS_BC17_OR_HIGHER(ctx) && !access.hasInstanceType && instanceType == INSTANCE_STACKTOP) {
+        instanceType = resolveInstanceStackTop(ctx);
+    }
+#endif
 
     // GML: writing through an object reference (obj_foo.var = val) sets the variable on ALL instances of that object
     if (instanceType >= 0 && 100000 > instanceType) {

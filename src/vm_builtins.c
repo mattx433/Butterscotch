@@ -4181,6 +4181,22 @@ static RValue builtin_drawSpritePartExt(VMContext* ctx, RValue* args, MAYBE_UNUS
         subimg = (int32_t) ((Instance*) ctx->currentInstance)->imageIndex;
     }
 
+    // DEBUG: log args + caller instance state so we can see sprite_width vs. sprite.width vs. bounding box.
+    {
+        Instance* inst = (Instance*) ctx->currentInstance;
+        const char* sprName = "?";
+        uint32_t sprW = 0, sprH = 0;
+        if (spriteIndex >= 0 && runner->dataWin->sprt.count > (uint32_t) spriteIndex) {
+            Sprite* sp = &runner->dataWin->sprt.sprites[spriteIndex];
+            sprName = sp->name ? sp->name : "?";
+            sprW = sp->width;
+            sprH = sp->height;
+        }
+        fprintf(stderr, "draw_sprite_part_ext spriteIndex=%d name=%s sprtWH=(%u,%u) subimg=%d reqSrc=(%d,%d,%d,%d) x=%.1f y=%.1f scale=(%.2f,%.2f) instImageScale=(%.2f,%.2f)\n",
+                spriteIndex, sprName, sprW, sprH, subimg, left, top, width, height, x, y, xscale, yscale,
+                inst ? (double) inst->imageXscale : 0.0, inst ? (double) inst->imageYscale : 0.0);
+    }
+
     Renderer_drawSpritePartExt(runner->renderer, spriteIndex, subimg, left, top, width, height, x, y, xscale, yscale, color, alpha);
     return RValue_makeUndefined();
 }
@@ -5116,6 +5132,48 @@ static RValue builtinCollisionPoint(VMContext* ctx, RValue* args, int32_t argCou
     }
 
     return RValue_makeReal((GMLReal) INSTANCE_NOONE);
+}
+
+// instance_place(x, y, obj) - returns colliding instance id at (x, y), or noone
+static RValue builtinInstancePlace(VMContext* ctx, RValue* args, int32_t argCount) {
+    if (3 > argCount) return RValue_makeReal((GMLReal) INSTANCE_NOONE);
+
+    Runner* runner = (Runner*) ctx->runner;
+    Instance* caller = (Instance*) ctx->currentInstance;
+    if (caller == nullptr) return RValue_makeReal((GMLReal) INSTANCE_NOONE);
+
+    GMLReal testX = RValue_toReal(args[0]);
+    GMLReal testY = RValue_toReal(args[1]);
+    int32_t targetObjIndex = RValue_toInt32(args[2]);
+
+    GMLReal savedX = caller->x;
+    GMLReal savedY = caller->y;
+    caller->x = testX;
+    caller->y = testY;
+
+    InstanceBBox callerBBox = Collision_computeBBox(runner->dataWin, caller);
+    int32_t resultId = INSTANCE_NOONE;
+
+    if (callerBBox.valid) {
+        int32_t instanceCount = (int32_t) arrlen(runner->instances);
+        repeat(instanceCount, i) {
+            Instance* other = runner->instances[i];
+            if (!other->active || other == caller) continue;
+            if (!Collision_matchesTarget(runner->dataWin, other, targetObjIndex)) continue;
+
+            InstanceBBox otherBBox = Collision_computeBBox(runner->dataWin, other);
+            if (!otherBBox.valid) continue;
+
+            if (Collision_instancesOverlapPrecise(runner->dataWin, caller, other, callerBBox, otherBBox)) {
+                resultId = other->instanceId;
+                break;
+            }
+        }
+    }
+
+    caller->x = savedX;
+    caller->y = savedY;
+    return RValue_makeReal((GMLReal) resultId);
 }
 
 // instance_position(x, y, obj)
@@ -6489,6 +6547,7 @@ void VMBuiltins_registerAll(VMContext* ctx) {
     VM_registerBuiltin(ctx, "collision_rectangle", builtinCollisionRectangle);
     VM_registerBuiltin(ctx, "collision_line", builtinCollisionLine);
     VM_registerBuiltin(ctx, "collision_point", builtinCollisionPoint);
+    VM_registerBuiltin(ctx, "instance_place", builtinInstancePlace);
     VM_registerBuiltin(ctx, "instance_position", builtinInstancePosition);
     VM_registerBuiltin(ctx, "place_free", builtinPlaceFree);
     VM_registerBuiltin(ctx, "place_empty", builtinPlaceEmpty);

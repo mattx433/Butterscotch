@@ -438,7 +438,7 @@ void Runner_draw(Runner* runner) {
     // Draw non-foreground backgrounds (behind everything)
     if (!DataWin_isVersionAtLeast(runner->dataWin, 2, 0, 0, 0))
         Runner_drawBackgrounds(runner, false);
- 
+
     // Fire draw subtypes in correct GameMaker order
     fireDrawSubtype(runner, drawList, drawCount, DRAW_PRE);
     fireDrawSubtype(runner, drawList, drawCount, DRAW_BEGIN);
@@ -762,6 +762,24 @@ static void returnPersistentInstances(Runner* runner, Instance** carriedPersiste
     arrfree(carriedPersistent);
 }
 
+static void copyRoomViewToRuntimeView(RoomView* roomView, RuntimeView* runtimeView) {
+    runtimeView->enabled = roomView->enabled;
+    runtimeView->viewX = roomView->viewX;
+    runtimeView->viewY = roomView->viewY;
+    runtimeView->viewWidth = roomView->viewWidth;
+    runtimeView->viewHeight = roomView->viewHeight;
+    runtimeView->portX = roomView->portX;
+    runtimeView->portY = roomView->portY;
+    runtimeView->portWidth = roomView->portWidth;
+    runtimeView->portHeight = roomView->portHeight;
+    runtimeView->borderX = roomView->borderX;
+    runtimeView->borderY = roomView->borderY;
+    runtimeView->speedX = roomView->speedX;
+    runtimeView->speedY = roomView->speedY;
+    runtimeView->objectId = roomView->objectId;
+    runtimeView->viewAngle = 0;
+}
+
 static void initRoom(Runner* runner, int32_t roomIndex) {
     DataWin* dataWin = runner->dataWin;
     require(roomIndex >= 0 && dataWin->room.count > (uint32_t) roomIndex);
@@ -789,6 +807,8 @@ static void initRoom(Runner* runner, int32_t roomIndex) {
 
     // If this is a persistent room that was previously visited, restore saved state
     if (room->persistent && savedState->initialized) {
+        memcpy(runner->views, savedState->views, sizeof(runner->views));
+
         // Restore backgrounds from saved state
         memcpy(runner->backgrounds, savedState->backgrounds, sizeof(runner->backgrounds));
         runner->backgroundColor = savedState->backgroundColor;
@@ -823,6 +843,11 @@ static void initRoom(Runner* runner, int32_t roomIndex) {
     }
 
     // === Normal room initialization (first visit, or non-persistent room) ===
+
+    // Initialize the views from scratch
+    repeat(MAX_VIEWS, vi) {
+        copyRoomViewToRuntimeView(&room->views[vi], &runner->views[vi]);
+    }
 
     // Reset tile layer state for the new room
     hmfree(runner->tileLayerMap);
@@ -1190,7 +1215,7 @@ RuntimeLayerElement* Runner_findLayerElementById(Runner* runner, int32_t element
             if ((int32_t) runtimeLayer->elements[j].id == elementId) {
                 if (outLayer != nullptr)
                     *outLayer = runtimeLayer;
-                
+
                 return &runtimeLayer->elements[j];
             }
         }
@@ -1386,33 +1411,24 @@ static void updateViews(Runner* runner) {
     Room* room = runner->currentRoom;
     if (!(room->flags & 1)) return;
 
-    repeat(8, vi) {
-        RoomView* view = &room->views[vi];
-        if (!view->enabled) continue;
+    repeat(MAX_VIEWS, vi) {
+        RuntimeView* view = &runner->views[vi];
+        if (!view->enabled || 0 > view->objectId) continue;
 
-        if (view->objectId >= 0) {
-            // Find first active instance of the target object
-            Instance* target = nullptr;
-            int32_t count = (int32_t) arrlen(runner->instances);
-            repeat(count, i) {
-                Instance* inst = runner->instances[i];
-                if (inst->active && VM_isObjectOrDescendant(runner->dataWin, inst->objectIndex, view->objectId)) { target = inst; break; };
-            }
-
-            if (target != nullptr) {
-                int32_t ix = (int32_t) GMLReal_floor(target->x);
-                int32_t iy = (int32_t) GMLReal_floor(target->y);
-                view->viewX = followAxis(view->viewX, view->viewWidth, ix, view->borderX, view->speedX, (int32_t) room->width);
-                view->viewY = followAxis(view->viewY, view->viewHeight, iy, view->borderY, view->speedY, (int32_t) room->height);
-                continue;
-            }
+        // Find first active instance of the target object
+        Instance* target = nullptr;
+        int32_t count = (int32_t) arrlen(runner->instances);
+        repeat(count, i) {
+            Instance* inst = runner->instances[i];
+            if (inst->active && VM_isObjectOrDescendant(runner->dataWin, inst->objectIndex, view->objectId)) { target = inst; break; };
         }
 
-        // Always clamp to room bounds
-        if (view->viewX + view->viewWidth > (int32_t) room->width) view->viewX = (int32_t) room->width - view->viewWidth;
-        if (view->viewY + view->viewHeight > (int32_t) room->height) view->viewY = (int32_t) room->height - view->viewHeight;
-        if (0 > view->viewX) view->viewX = 0;
-        if (0 > view->viewY) view->viewY = 0;
+        if (target != nullptr) {
+            int32_t ix = (int32_t) GMLReal_floor(target->x);
+            int32_t iy = (int32_t) GMLReal_floor(target->y);
+            view->viewX = followAxis(view->viewX, view->viewWidth, ix, view->borderX, view->speedX, (int32_t) room->width);
+            view->viewY = followAxis(view->viewY, view->viewHeight, iy, view->borderY, view->speedY, (int32_t) room->height);
+        }
     }
 }
 
@@ -1564,6 +1580,55 @@ static bool adaptPath(Runner* runner, Instance* inst) {
     return atPathEnd;
 }
 
+static void persistRoomState(Runner* runner, int32_t roomIndex) {
+    SavedRoomState* state = &runner->savedRoomStates[roomIndex];
+
+    // Free any previously saved instances (from an earlier visit)
+    int32_t prevSavedCount = (int32_t) arrlen(state->instances);
+    repeat(prevSavedCount, i) {
+        hmdel(runner->instancesToId, state->instances[i]->instanceId);
+        Instance_free(state->instances[i]);
+    }
+    arrfree(state->instances);
+    state->instances = nullptr;
+    hmfree(state->tileLayerMap);
+    state->tileLayerMap = nullptr;
+    freeRuntimeLayersArray(&state->runtimeLayers);
+
+    // Separate persistent instances (travel with player) from room instances (saved)
+    Instance** keptInstances = nullptr;
+    int32_t count = (int32_t) arrlen(runner->instances);
+    repeat(count, i) {
+        Instance* inst = runner->instances[i];
+        if (inst->persistent) {
+            arrput(keptInstances, inst);
+        } else if (inst->active) {
+            arrput(state->instances, inst);
+        } else {
+            hmdel(runner->instancesToId, inst->instanceId);
+            Instance_free(inst);
+        }
+    }
+    arrfree(runner->instances);
+    runner->instances = keptInstances;
+
+    // Save room visual state
+    memcpy(state->backgrounds, runner->backgrounds, sizeof(runner->backgrounds));
+    memcpy(state->views, runner->views, sizeof(runner->views));
+    state->backgroundColor = runner->backgroundColor;
+    state->drawBackgroundColor = runner->drawBackgroundColor;
+
+    // Transfer tile layer map ownership to saved state
+    state->tileLayerMap = runner->tileLayerMap;
+    runner->tileLayerMap = nullptr;
+
+    // Transfer runtime layer ownership to saved state
+    state->runtimeLayers = runner->runtimeLayers;
+    runner->runtimeLayers = nullptr;
+
+    state->initialized = true;
+}
+
 void Runner_step(Runner* runner) {
     // Save xprevious/yprevious and path_positionprevious for all active instances
     int32_t prevCount = (int32_t) arrlen(runner->instances);
@@ -1710,7 +1775,7 @@ void Runner_step(Runner* runner) {
     // Execute End Step for all instances
     Runner_executeEventForAll(runner, EVENT_STEP, STEP_END);
 
-    // Update view following and clamping
+    // Update view following
     updateViews(runner);
 
     // Handle game restart
@@ -1744,51 +1809,7 @@ void Runner_step(Runner* runner) {
 
         // If the old room is persistent, save its instance and visual state
         if (oldRoom->persistent) {
-            SavedRoomState* state = &runner->savedRoomStates[oldRoomIndex];
-
-            // Free any previously saved instances (from an earlier visit)
-            int32_t prevSavedCount = (int32_t) arrlen(state->instances);
-            repeat(prevSavedCount, i) {
-                hmdel(runner->instancesToId, state->instances[i]->instanceId);
-                Instance_free(state->instances[i]);
-            }
-            arrfree(state->instances);
-            state->instances = nullptr;
-            hmfree(state->tileLayerMap);
-            state->tileLayerMap = nullptr;
-            freeRuntimeLayersArray(&state->runtimeLayers);
-
-            // Separate persistent instances (travel with player) from room instances (saved)
-            Instance** keptInstances = nullptr;
-            int32_t count = (int32_t) arrlen(runner->instances);
-            repeat(count, i) {
-                Instance* inst = runner->instances[i];
-                if (inst->persistent) {
-                    arrput(keptInstances, inst);
-                } else if (inst->active) {
-                    arrput(state->instances, inst);
-                } else {
-                    hmdel(runner->instancesToId, inst->instanceId);
-                    Instance_free(inst);
-                }
-            }
-            arrfree(runner->instances);
-            runner->instances = keptInstances;
-
-            // Save room visual state
-            memcpy(state->backgrounds, runner->backgrounds, sizeof(runner->backgrounds));
-            state->backgroundColor = runner->backgroundColor;
-            state->drawBackgroundColor = runner->drawBackgroundColor;
-
-            // Transfer tile layer map ownership to saved state
-            state->tileLayerMap = runner->tileLayerMap;
-            runner->tileLayerMap = nullptr;
-
-            // Transfer runtime layer ownership to saved state
-            state->runtimeLayers = runner->runtimeLayers;
-            runner->runtimeLayers = nullptr;
-
-            state->initialized = true;
+            persistRoomState(runner, oldRoomIndex);
         }
 
         // Free the outgoing room's payload under lazyLoadRooms, unless it's eagerly pinned or we're restarting the same room (initRoom would just re-load it).

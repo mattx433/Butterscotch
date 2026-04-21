@@ -22,7 +22,6 @@
 #include "audio_system.h"
 #include "file_system.h"
 
-#define MAX_VIEWS 8
 #define MAX_BACKGROUNDS 8
 
 // ===[ STUB LOGGING ]===
@@ -439,63 +438,63 @@ RValue VMBuiltins_getVariable(VMContext* ctx, int16_t builtinVarId, const char* 
     if (builtinVarId == BUILTIN_VAR_ROOM_PERSISTENT) return RValue_makeBool(runner->currentRoom->persistent);
     if (builtinVarId == BUILTIN_VAR_VIEW_CURRENT) return RValue_makeReal((GMLReal) runner->viewCurrent);
     if (builtinVarId == BUILTIN_VAR_VIEW_XVIEW) {
-        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->currentRoom->views[arrayIndex].viewX);
+        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].viewX);
         return RValue_makeReal(0.0);
     }
     if (builtinVarId == BUILTIN_VAR_VIEW_YVIEW) {
-        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->currentRoom->views[arrayIndex].viewY);
+        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].viewY);
         return RValue_makeReal(0.0);
     }
     if (builtinVarId == BUILTIN_VAR_VIEW_WVIEW) {
-        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->currentRoom->views[arrayIndex].viewWidth);
+        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].viewWidth);
         return RValue_makeReal(0.0);
     }
     if (builtinVarId == BUILTIN_VAR_VIEW_HVIEW) {
-        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->currentRoom->views[arrayIndex].viewHeight);
+        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].viewHeight);
         return RValue_makeReal(0.0);
     }
     if (builtinVarId == BUILTIN_VAR_VIEW_XPORT) {
-        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->currentRoom->views[arrayIndex].portX);
+        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].portX);
         return RValue_makeReal(0.0);
     }
     if (builtinVarId == BUILTIN_VAR_VIEW_YPORT) {
-        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->currentRoom->views[arrayIndex].portY);
+        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].portY);
         return RValue_makeReal(0.0);
     }
     if (builtinVarId == BUILTIN_VAR_VIEW_WPORT) {
-        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->currentRoom->views[arrayIndex].portWidth);
+        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].portWidth);
         return RValue_makeReal(0.0);
     }
     if (builtinVarId == BUILTIN_VAR_VIEW_HPORT) {
-        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->currentRoom->views[arrayIndex].portHeight);
+        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].portHeight);
         return RValue_makeReal(0.0);
     }
     if (builtinVarId == BUILTIN_VAR_VIEW_VISIBLE) {
-        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeBool(runner->currentRoom->views[arrayIndex].enabled);
+        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeBool(runner->views[arrayIndex].enabled);
         return RValue_makeBool(false);
     }
     if (builtinVarId == BUILTIN_VAR_VIEW_ANGLE) {
-        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->viewAngles[arrayIndex]);
+        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].viewAngle);
         return RValue_makeReal(0.0);
     }
     if (builtinVarId == BUILTIN_VAR_VIEW_HBORDER) {
-        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->currentRoom->views[arrayIndex].borderX);
+        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].borderX);
         return RValue_makeReal(0.0);
     }
     if (builtinVarId == BUILTIN_VAR_VIEW_VBORDER) {
-        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->currentRoom->views[arrayIndex].borderY);
+        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].borderY);
         return RValue_makeReal(0.0);
     }
     if (builtinVarId == BUILTIN_VAR_VIEW_OBJECT) {
-        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->currentRoom->views[arrayIndex].objectId);
+        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].objectId);
         return RValue_makeReal(-4.0);
     }
     if (builtinVarId == BUILTIN_VAR_VIEW_HSPEED) {
-        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->currentRoom->views[arrayIndex].speedX);
+        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].speedX);
         return RValue_makeReal(0.0);
     }
     if (builtinVarId == BUILTIN_VAR_VIEW_VSPEED) {
-        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->currentRoom->views[arrayIndex].speedY);
+        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].speedY);
         return RValue_makeReal(0.0);
     }
 
@@ -722,21 +721,21 @@ void VMBuiltins_setVariable(VMContext* ctx, int16_t builtinVarId, const char* na
     }
 
     // View properties
-    if (builtinVarId == BUILTIN_VAR_VIEW_XVIEW) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->currentRoom->views[arrayIndex].viewX = RValue_toInt32(val); } return; }
-    if (builtinVarId == BUILTIN_VAR_VIEW_YVIEW) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->currentRoom->views[arrayIndex].viewY = RValue_toInt32(val); } return; }
-    if (builtinVarId == BUILTIN_VAR_VIEW_WVIEW) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->currentRoom->views[arrayIndex].viewWidth = RValue_toInt32(val); } return; }
-    if (builtinVarId == BUILTIN_VAR_VIEW_HVIEW) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->currentRoom->views[arrayIndex].viewHeight = RValue_toInt32(val); } return; }
-    if (builtinVarId == BUILTIN_VAR_VIEW_XPORT) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->currentRoom->views[arrayIndex].portX = RValue_toInt32(val); } return; }
-    if (builtinVarId == BUILTIN_VAR_VIEW_YPORT) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->currentRoom->views[arrayIndex].portY = RValue_toInt32(val); } return; }
-    if (builtinVarId == BUILTIN_VAR_VIEW_WPORT) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->currentRoom->views[arrayIndex].portWidth = RValue_toInt32(val); } return; }
-    if (builtinVarId == BUILTIN_VAR_VIEW_HPORT) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->currentRoom->views[arrayIndex].portHeight = RValue_toInt32(val); } return; }
-    if (builtinVarId == BUILTIN_VAR_VIEW_VISIBLE) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->currentRoom->views[arrayIndex].enabled = RValue_toBool(val); } return; }
-    if (builtinVarId == BUILTIN_VAR_VIEW_ANGLE) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->viewAngles[arrayIndex] = (float) RValue_toReal(val); } return; }
-    if (builtinVarId == BUILTIN_VAR_VIEW_HBORDER) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->currentRoom->views[arrayIndex].borderX = RValue_toInt32(val); } return; }
-    if (builtinVarId == BUILTIN_VAR_VIEW_VBORDER) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->currentRoom->views[arrayIndex].borderY = RValue_toInt32(val); } return; }
-    if (builtinVarId == BUILTIN_VAR_VIEW_OBJECT) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->currentRoom->views[arrayIndex].objectId = RValue_toInt32(val); } return; }
-    if (builtinVarId == BUILTIN_VAR_VIEW_HSPEED) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->currentRoom->views[arrayIndex].speedX = RValue_toInt32(val); } return; }
-    if (builtinVarId == BUILTIN_VAR_VIEW_VSPEED) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->currentRoom->views[arrayIndex].speedY = RValue_toInt32(val); } return; }
+    if (builtinVarId == BUILTIN_VAR_VIEW_XVIEW) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->views[arrayIndex].viewX = RValue_toInt32(val); } return; }
+    if (builtinVarId == BUILTIN_VAR_VIEW_YVIEW) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->views[arrayIndex].viewY = RValue_toInt32(val); } return; }
+    if (builtinVarId == BUILTIN_VAR_VIEW_WVIEW) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->views[arrayIndex].viewWidth = RValue_toInt32(val); } return; }
+    if (builtinVarId == BUILTIN_VAR_VIEW_HVIEW) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->views[arrayIndex].viewHeight = RValue_toInt32(val); } return; }
+    if (builtinVarId == BUILTIN_VAR_VIEW_XPORT) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->views[arrayIndex].portX = RValue_toInt32(val); } return; }
+    if (builtinVarId == BUILTIN_VAR_VIEW_YPORT) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->views[arrayIndex].portY = RValue_toInt32(val); } return; }
+    if (builtinVarId == BUILTIN_VAR_VIEW_WPORT) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->views[arrayIndex].portWidth = RValue_toInt32(val); } return; }
+    if (builtinVarId == BUILTIN_VAR_VIEW_HPORT) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->views[arrayIndex].portHeight = RValue_toInt32(val); } return; }
+    if (builtinVarId == BUILTIN_VAR_VIEW_VISIBLE) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->views[arrayIndex].enabled = RValue_toBool(val); } return; }
+    if (builtinVarId == BUILTIN_VAR_VIEW_ANGLE) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->views[arrayIndex].viewAngle = (float) RValue_toReal(val); } return; }
+    if (builtinVarId == BUILTIN_VAR_VIEW_HBORDER) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->views[arrayIndex].borderX = RValue_toInt32(val); } return; }
+    if (builtinVarId == BUILTIN_VAR_VIEW_VBORDER) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->views[arrayIndex].borderY = RValue_toInt32(val); } return; }
+    if (builtinVarId == BUILTIN_VAR_VIEW_OBJECT) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->views[arrayIndex].objectId = RValue_toInt32(val); } return; }
+    if (builtinVarId == BUILTIN_VAR_VIEW_HSPEED) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->views[arrayIndex].speedX = RValue_toInt32(val); } return; }
+    if (builtinVarId == BUILTIN_VAR_VIEW_VSPEED) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->views[arrayIndex].speedY = RValue_toInt32(val); } return; }
 
     // Background properties
     if (builtinVarId == BUILTIN_VAR_BACKGROUND_VISIBLE) { if (arrayIndex >= 0 && MAX_BACKGROUNDS > arrayIndex) runner->backgrounds[arrayIndex].visible = RValue_toBool(val); return; }
@@ -1500,7 +1499,7 @@ static RValue builtinCameraGetViewX(VMContext* ctx, RValue* args, int32_t argCou
     Runner* runner = requireNotNullMessage(ctx->runner, "VM: camera_get_view_x called but no runner!");
     int32_t cameraId = RValue_toInt32(args[0]);
     if (cameraId >= 0 && MAX_VIEWS > cameraId) {
-        return RValue_makeReal((double) runner->currentRoom->views[cameraId].viewX);
+        return RValue_makeReal((double) runner->views[cameraId].viewX);
     }
     return RValue_makeReal(-1);
 }
@@ -1510,7 +1509,7 @@ static RValue builtinCameraGetViewY(VMContext* ctx, RValue* args, int32_t argCou
     Runner* runner = requireNotNullMessage(ctx->runner, "VM: camera_get_view_y called but no runner!");
     int32_t cameraId = RValue_toInt32(args[0]);
     if (cameraId >= 0 && MAX_VIEWS > cameraId) {
-        return RValue_makeReal((double) runner->currentRoom->views[cameraId].viewY);
+        return RValue_makeReal((double) runner->views[cameraId].viewY);
     }
     return RValue_makeReal(-1);
 }
@@ -1520,7 +1519,7 @@ static RValue builtinCameraGetViewWidth(VMContext* ctx, RValue* args, int32_t ar
     Runner* runner = requireNotNullMessage(ctx->runner, "VM: camera_get_view_width called but no runner!");
     int32_t cameraId = RValue_toInt32(args[0]);
     if (cameraId >= 0 && MAX_VIEWS > cameraId) {
-        return RValue_makeReal((double) runner->currentRoom->views[cameraId].viewWidth);
+        return RValue_makeReal((double) runner->views[cameraId].viewWidth);
     }
     return RValue_makeReal(-1);
 }
@@ -1530,7 +1529,7 @@ static RValue builtinCameraGetViewHeight(VMContext* ctx, RValue* args, int32_t a
     Runner* runner = requireNotNullMessage(ctx->runner, "VM: camera_get_view_height called but no runner!");
     int32_t cameraId = RValue_toInt32(args[0]);
     if (cameraId >= 0 && MAX_VIEWS > cameraId) {
-        return RValue_makeReal((double) runner->currentRoom->views[cameraId].viewHeight);
+        return RValue_makeReal((double) runner->views[cameraId].viewHeight);
     }
     return RValue_makeReal(-1);
 }
@@ -1542,8 +1541,8 @@ static RValue builtinCameraSetViewPos(VMContext* ctx, RValue* args, int32_t argC
     int32_t x = RValue_toInt32(args[1]);
     int32_t y = RValue_toInt32(args[2]);
     if (cameraId >= 0 && MAX_VIEWS > cameraId) {
-        runner->currentRoom->views[cameraId].viewX = x;
-        runner->currentRoom->views[cameraId].viewY = y;
+        runner->views[cameraId].viewX = x;
+        runner->views[cameraId].viewY = y;
     }
     return RValue_makeUndefined();
 }
@@ -1553,7 +1552,7 @@ static RValue builtinCameraGetViewTarget(VMContext* ctx, RValue* args, int32_t a
     Runner* runner = requireNotNullMessage(ctx->runner, "VM: camera_get_view_target called but no runner!");
     int32_t cameraId = RValue_toInt32(args[0]);
     if (cameraId >= 0 && MAX_VIEWS > cameraId) {
-        return RValue_makeReal((double) runner->currentRoom->views[cameraId].objectId);
+        return RValue_makeReal((double) runner->views[cameraId].objectId);
     }
     return RValue_makeReal(-1);
 }
@@ -1564,7 +1563,7 @@ static RValue builtinCameraSetViewTarget(VMContext* ctx, RValue* args, int32_t a
     int32_t cameraId = RValue_toInt32(args[0]);
     int32_t objectId = RValue_toInt32(args[1]);
     if (cameraId >= 0 && MAX_VIEWS > cameraId) {
-        runner->currentRoom->views[cameraId].objectId = objectId;
+        runner->views[cameraId].objectId = objectId;
     }
     return RValue_makeUndefined();
 }
@@ -1574,8 +1573,8 @@ static RValue cameraGetViewBorder(VMContext* ctx, RValue* args, int32_t argCount
     Runner* runner = requireNotNullMessage(ctx->runner, "VM: camera_get_view_border called but no runner!");
     int32_t cameraId = RValue_toInt32(args[0]);
     if (cameraId >= 0 && MAX_VIEWS > cameraId) {
-        RoomView* v = &runner->currentRoom->views[cameraId];
-        return RValue_makeReal((double) (wantY ? v->borderY : v->borderX));
+        RuntimeView v = runner->views[cameraId];
+        return RValue_makeReal((double) (wantY ? v.borderY : v.borderX));
     }
     return RValue_makeReal(-1);
 }
@@ -1595,8 +1594,8 @@ static RValue builtinCameraSetViewBorder(VMContext* ctx, RValue* args, int32_t a
     int32_t bx = RValue_toInt32(args[1]);
     int32_t by = RValue_toInt32(args[2]);
     if (cameraId >= 0 && MAX_VIEWS > cameraId) {
-        runner->currentRoom->views[cameraId].borderX = (uint32_t) bx;
-        runner->currentRoom->views[cameraId].borderY = (uint32_t) by;
+        runner->views[cameraId].borderX = (uint32_t) bx;
+        runner->views[cameraId].borderY = (uint32_t) by;
     }
     return RValue_makeUndefined();
 }

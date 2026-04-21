@@ -583,6 +583,14 @@ static RValue resolveVariableRead(VMContext* ctx, int32_t instanceType, uint32_t
             if (ctx->scriptArgs != nullptr && ctx->scriptArgCount > argIndex) {
                 result = ctx->scriptArgs[argIndex];
                 result.ownsString = false;
+                // If we are trying to access the argument via an array (example: argName[i]), we NEED to read INSIDE the array
+                // Example:
+                // function init(arg2) {
+                //     var test = arg2[0]; // We NEED to read the [0] from the array
+                // }
+                if (access.isArray && result.type == RVALUE_ARRAY && result.array != nullptr) {
+                    result = VM_arrayReadAt(&result, access.arrayIndex);
+                }
             } else {
                 result = RValue_makeUndefined();
             }

@@ -39,6 +39,19 @@ static void logStubbedFunction(VMContext* ctx, const char* funcName) {
     }
 }
 
+static void logSemiStubbedFunction(VMContext* ctx, const char* funcName) {
+    const char* callerName = VM_getCallerName(ctx);
+    char* dedupKey = VM_createDedupKey(callerName, funcName);
+
+    if (ctx->alwaysLogStubbedFunctions || 0 > shgeti(ctx->loggedStubbedFuncs, dedupKey)) {
+        // shput stores the key pointer, so don't free it when inserting
+        shput(ctx->loggedStubbedFuncs, dedupKey, true);
+        fprintf(stderr, "VM: [%s] Semi-Stubbed function \"%s\"!\n", callerName, funcName);
+    } else {
+        free(dedupKey);
+    }
+}
+
 // ===[ DS_MAP SYSTEM ]===
 
 static int32_t dsMapCreate(Runner* runner) {
@@ -4394,6 +4407,8 @@ static RValue builtin_drawTextTransformed(VMContext* ctx, RValue* args, MAYBE_UN
 }
 
 static RValue builtin_drawTextExt(VMContext* ctx, RValue* args, MAYBE_UNUSED int32_t argCount) {
+    logSemiStubbedFunction(ctx, "draw_text_ext");
+    
     Runner* runner = (Runner*) ctx->runner;
     if (runner->renderer == nullptr) return RValue_makeUndefined();
 

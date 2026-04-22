@@ -5925,6 +5925,42 @@ static RValue builtinLayerSpriteGetY(VMContext* ctx, RValue* args, MAYBE_UNUSED 
     return RValue_makeReal((GMLReal) el->spriteElement->y);
 }
 
+static RValue builtinLayerSpriteGetXScale(VMContext* ctx, RValue* args, MAYBE_UNUSED int32_t argCount) {
+    Runner* runner = (Runner*) ctx->runner;
+    int32_t id = RValue_toInt32(args[0]);
+    RuntimeLayerElement* el = Runner_findLayerElementById(runner, id, nullptr);
+    if (el == nullptr || el->type != RuntimeLayerElementType_Sprite || el->spriteElement == nullptr)
+        return RValue_makeReal(1.0);
+    return RValue_makeReal((GMLReal) el->spriteElement->scaleX);
+}
+
+static RValue builtinLayerSpriteGetYScale(VMContext* ctx, RValue* args, MAYBE_UNUSED int32_t argCount) {
+    Runner* runner = (Runner*) ctx->runner;
+    int32_t id = RValue_toInt32(args[0]);
+    RuntimeLayerElement* el = Runner_findLayerElementById(runner, id, nullptr);
+    if (el == nullptr || el->type != RuntimeLayerElementType_Sprite || el->spriteElement == nullptr)
+        return RValue_makeReal(1.0);
+    return RValue_makeReal((GMLReal) el->spriteElement->scaleY);
+}
+
+static RValue builtinLayerSpriteGetSpeed(VMContext* ctx, RValue* args, MAYBE_UNUSED int32_t argCount) {
+    Runner* runner = (Runner*) ctx->runner;
+    int32_t id = RValue_toInt32(args[0]);
+    RuntimeLayerElement* el = Runner_findLayerElementById(runner, id, nullptr);
+    if (el == nullptr || el->type != RuntimeLayerElementType_Sprite || el->spriteElement == nullptr)
+        return RValue_makeReal(0.0);
+    return RValue_makeReal((GMLReal) el->spriteElement->animationSpeed);
+}
+
+static RValue builtinLayerSpriteGetIndex(VMContext* ctx, RValue* args, MAYBE_UNUSED int32_t argCount) {
+    Runner* runner = (Runner*) ctx->runner;
+    int32_t id = RValue_toInt32(args[0]);
+    RuntimeLayerElement* el = Runner_findLayerElementById(runner, id, nullptr);
+    if (el == nullptr || el->type != RuntimeLayerElementType_Sprite || el->spriteElement == nullptr)
+        return RValue_makeReal(0.0);
+    return RValue_makeReal((GMLReal) el->spriteElement->frameIndex);
+}
+
 static RValue builtinLayerSpriteDestroy(VMContext* ctx, RValue* args, MAYBE_UNUSED int32_t argCount) {
     Runner* runner = (Runner*) ctx->runner;
     int32_t id = RValue_toInt32(args[0]);
@@ -6829,6 +6865,10 @@ void VMBuiltins_registerAll(VMContext* ctx) {
     VM_registerBuiltin(ctx, "layer_sprite_get_sprite", builtinLayerSpriteGetSprite);
     VM_registerBuiltin(ctx, "layer_sprite_get_x", builtinLayerSpriteGetX);
     VM_registerBuiltin(ctx, "layer_sprite_get_y", builtinLayerSpriteGetY);
+    VM_registerBuiltin(ctx, "layer_sprite_get_xscale", builtinLayerSpriteGetXScale);
+    VM_registerBuiltin(ctx, "layer_sprite_get_yscale", builtinLayerSpriteGetYScale);
+    VM_registerBuiltin(ctx, "layer_sprite_get_speed", builtinLayerSpriteGetSpeed);
+    VM_registerBuiltin(ctx, "layer_sprite_get_index", builtinLayerSpriteGetIndex);
     VM_registerBuiltin(ctx, "layer_sprite_destroy", builtinLayerSpriteDestroy);
 #if IS_BC17_OR_HIGHER_ENABLED
     VM_registerBuiltin(ctx, "layer_get_id_at_depth", builtinLayerGetIdAtDepth);

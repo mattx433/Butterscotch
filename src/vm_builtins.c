@@ -313,38 +313,38 @@ RValue VMBuiltins_getVariable(VMContext* ctx, int16_t builtinVarId, const char* 
     }
 
     // OS constants
-    if (builtinVarId == BUILTIN_VAR_OS_TYPE) return RValue_makeReal((double) runner->osType);
-    if (builtinVarId == BUILTIN_VAR_OS_UNKNOWN) return RValue_makeReal((double) OS_UNKNOWN);
-    if (builtinVarId == BUILTIN_VAR_OS_WIN32) return RValue_makeReal((double) OS_WINDOWS);
-    if (builtinVarId == BUILTIN_VAR_OS_WINDOWS) return RValue_makeReal((double) OS_WINDOWS);
-    if (builtinVarId == BUILTIN_VAR_OS_MACOSX) return RValue_makeReal((double) OS_MACOSX);
-    if (builtinVarId == BUILTIN_VAR_OS_PSP) return RValue_makeReal((double) OS_PSP);
-    if (builtinVarId == BUILTIN_VAR_OS_IOS) return RValue_makeReal((double) OS_IOS);
-    if (builtinVarId == BUILTIN_VAR_OS_ANDROID) return RValue_makeReal((double) OS_ANDROID);
-    if (builtinVarId == BUILTIN_VAR_OS_SYMBIAN) return RValue_makeReal((double) OS_SYMBIAN);
-    if (builtinVarId == BUILTIN_VAR_OS_LINUX) return RValue_makeReal((double) OS_LINUX);
-    if (builtinVarId == BUILTIN_VAR_OS_WINPHONE) return RValue_makeReal((double) OS_WINPHONE);
-    if (builtinVarId == BUILTIN_VAR_OS_TIZEN) return RValue_makeReal((double) OS_TIZEN);
-    if (builtinVarId == BUILTIN_VAR_OS_WIN8NATIVE) return RValue_makeReal((double) OS_WIN8NATIVE);
-    if (builtinVarId == BUILTIN_VAR_OS_WIIU) return RValue_makeReal((double) OS_WIIU);
-    if (builtinVarId == BUILTIN_VAR_OS_3DS) return RValue_makeReal((double) OS_3DS);
-    if (builtinVarId == BUILTIN_VAR_OS_PSVITA) return RValue_makeReal((double) OS_PSVITA);
-    if (builtinVarId == BUILTIN_VAR_OS_BB10) return RValue_makeReal((double) OS_BB10);
-    if (builtinVarId == BUILTIN_VAR_OS_PS4) return RValue_makeReal((double) OS_PS4);
-    if (builtinVarId == BUILTIN_VAR_OS_XBOXONE) return RValue_makeReal((double) OS_XBOXONE);
-    if (builtinVarId == BUILTIN_VAR_OS_PS3) return RValue_makeReal((double) OS_PS3);
-    if (builtinVarId == BUILTIN_VAR_OS_XBOX360) return RValue_makeReal((double) OS_XBOX360);
-    if (builtinVarId == BUILTIN_VAR_OS_UWP) return RValue_makeReal((double) OS_UWP);
-    if (builtinVarId == BUILTIN_VAR_OS_AMAZON) return RValue_makeReal((double) OS_AMAZON);
-    if (builtinVarId == BUILTIN_VAR_OS_SWITCH) return RValue_makeReal((double) OS_SWITCH);
-    if (builtinVarId == BUILTIN_VAR_OS_LLVM_WIN32) return RValue_makeReal((double) OS_LLVM_WIN32);
-    if (builtinVarId == BUILTIN_VAR_OS_LLVM_MACOSX) return RValue_makeReal((double) OS_LLVM_MACOSX);
-    if (builtinVarId == BUILTIN_VAR_OS_LLVM_PSP) return RValue_makeReal((double) OS_LLVM_PSP);
-    if (builtinVarId == BUILTIN_VAR_OS_LLVM_IOS) return RValue_makeReal((double) OS_LLVM_IOS);
-    if (builtinVarId == BUILTIN_VAR_OS_LLVM_ANDROID) return RValue_makeReal((double) OS_LLVM_ANDROID);
-    if (builtinVarId == BUILTIN_VAR_OS_LLVM_SYMBIAN) return RValue_makeReal((double) OS_LLVM_SYMBIAN);
-    if (builtinVarId == BUILTIN_VAR_OS_LLVM_LINUX) return RValue_makeReal((double) OS_LLVM_LINUX);
-    if (builtinVarId == BUILTIN_VAR_OS_LLVM_WINPHONE) return RValue_makeReal((double) OS_LLVM_WINPHONE);
+    if (builtinVarId == BUILTIN_VAR_OS_TYPE) return RValue_makeReal(runner->osType);
+    if (builtinVarId == BUILTIN_VAR_OS_UNKNOWN) return RValue_makeReal(OS_UNKNOWN);
+    if (builtinVarId == BUILTIN_VAR_OS_WIN32) return RValue_makeReal(OS_WINDOWS);
+    if (builtinVarId == BUILTIN_VAR_OS_WINDOWS) return RValue_makeReal(OS_WINDOWS);
+    if (builtinVarId == BUILTIN_VAR_OS_MACOSX) return RValue_makeReal(OS_MACOSX);
+    if (builtinVarId == BUILTIN_VAR_OS_PSP) return RValue_makeReal(OS_PSP);
+    if (builtinVarId == BUILTIN_VAR_OS_IOS) return RValue_makeReal(OS_IOS);
+    if (builtinVarId == BUILTIN_VAR_OS_ANDROID) return RValue_makeReal(OS_ANDROID);
+    if (builtinVarId == BUILTIN_VAR_OS_SYMBIAN) return RValue_makeReal(OS_SYMBIAN);
+    if (builtinVarId == BUILTIN_VAR_OS_LINUX) return RValue_makeReal(OS_LINUX);
+    if (builtinVarId == BUILTIN_VAR_OS_WINPHONE) return RValue_makeReal(OS_WINPHONE);
+    if (builtinVarId == BUILTIN_VAR_OS_TIZEN) return RValue_makeReal(OS_TIZEN);
+    if (builtinVarId == BUILTIN_VAR_OS_WIN8NATIVE) return RValue_makeReal(OS_WIN8NATIVE);
+    if (builtinVarId == BUILTIN_VAR_OS_WIIU) return RValue_makeReal(OS_WIIU);
+    if (builtinVarId == BUILTIN_VAR_OS_3DS) return RValue_makeReal(OS_3DS);
+    if (builtinVarId == BUILTIN_VAR_OS_PSVITA) return RValue_makeReal(OS_PSVITA);
+    if (builtinVarId == BUILTIN_VAR_OS_BB10) return RValue_makeReal(OS_BB10);
+    if (builtinVarId == BUILTIN_VAR_OS_PS4) return RValue_makeReal(OS_PS4);
+    if (builtinVarId == BUILTIN_VAR_OS_XBOXONE) return RValue_makeReal(OS_XBOXONE);
+    if (builtinVarId == BUILTIN_VAR_OS_PS3) return RValue_makeReal(OS_PS3);
+    if (builtinVarId == BUILTIN_VAR_OS_XBOX360) return RValue_makeReal(OS_XBOX360);
+    if (builtinVarId == BUILTIN_VAR_OS_UWP) return RValue_makeReal(OS_UWP);
+    if (builtinVarId == BUILTIN_VAR_OS_AMAZON) return RValue_makeReal(OS_AMAZON);
+    if (builtinVarId == BUILTIN_VAR_OS_SWITCH) return RValue_makeReal(OS_SWITCH);
+    if (builtinVarId == BUILTIN_VAR_OS_LLVM_WIN32) return RValue_makeReal(OS_LLVM_WIN32);
+    if (builtinVarId == BUILTIN_VAR_OS_LLVM_MACOSX) return RValue_makeReal(OS_LLVM_MACOSX);
+    if (builtinVarId == BUILTIN_VAR_OS_LLVM_PSP) return RValue_makeReal(OS_LLVM_PSP);
+    if (builtinVarId == BUILTIN_VAR_OS_LLVM_IOS) return RValue_makeReal(OS_LLVM_IOS);
+    if (builtinVarId == BUILTIN_VAR_OS_LLVM_ANDROID) return RValue_makeReal(OS_LLVM_ANDROID);
+    if (builtinVarId == BUILTIN_VAR_OS_LLVM_SYMBIAN) return RValue_makeReal(OS_LLVM_SYMBIAN);
+    if (builtinVarId == BUILTIN_VAR_OS_LLVM_LINUX) return RValue_makeReal(OS_LLVM_LINUX);
+    if (builtinVarId == BUILTIN_VAR_OS_LLVM_WINPHONE) return RValue_makeReal(OS_LLVM_WINPHONE);
 
     // Per-instance properties
     if (inst != nullptr) {
@@ -1495,7 +1495,7 @@ static RValue builtinViewGetCamera(MAYBE_UNUSED VMContext* ctx, RValue* args, in
     if (1 > argCount) return RValue_makeReal(-1);
     int32_t viewIndex = RValue_toInt32(args[0]);
     if (viewIndex >= 0 && MAX_VIEWS > viewIndex) {
-        return RValue_makeReal((double) viewIndex);
+        return RValue_makeReal(viewIndex);
     }
     return RValue_makeReal(-1);
 }
@@ -1505,7 +1505,7 @@ static RValue builtinCameraGetViewX(VMContext* ctx, RValue* args, int32_t argCou
     Runner* runner = requireNotNullMessage(ctx->runner, "VM: camera_get_view_x called but no runner!");
     int32_t cameraId = RValue_toInt32(args[0]);
     if (cameraId >= 0 && MAX_VIEWS > cameraId) {
-        return RValue_makeReal((double) runner->views[cameraId].viewX);
+        return RValue_makeReal(runner->views[cameraId].viewX);
     }
     return RValue_makeReal(-1);
 }
@@ -1515,7 +1515,7 @@ static RValue builtinCameraGetViewY(VMContext* ctx, RValue* args, int32_t argCou
     Runner* runner = requireNotNullMessage(ctx->runner, "VM: camera_get_view_y called but no runner!");
     int32_t cameraId = RValue_toInt32(args[0]);
     if (cameraId >= 0 && MAX_VIEWS > cameraId) {
-        return RValue_makeReal((double) runner->views[cameraId].viewY);
+        return RValue_makeReal(runner->views[cameraId].viewY);
     }
     return RValue_makeReal(-1);
 }
@@ -1525,7 +1525,7 @@ static RValue builtinCameraGetViewWidth(VMContext* ctx, RValue* args, int32_t ar
     Runner* runner = requireNotNullMessage(ctx->runner, "VM: camera_get_view_width called but no runner!");
     int32_t cameraId = RValue_toInt32(args[0]);
     if (cameraId >= 0 && MAX_VIEWS > cameraId) {
-        return RValue_makeReal((double) runner->views[cameraId].viewWidth);
+        return RValue_makeReal(runner->views[cameraId].viewWidth);
     }
     return RValue_makeReal(-1);
 }
@@ -1535,7 +1535,7 @@ static RValue builtinCameraGetViewHeight(VMContext* ctx, RValue* args, int32_t a
     Runner* runner = requireNotNullMessage(ctx->runner, "VM: camera_get_view_height called but no runner!");
     int32_t cameraId = RValue_toInt32(args[0]);
     if (cameraId >= 0 && MAX_VIEWS > cameraId) {
-        return RValue_makeReal((double) runner->views[cameraId].viewHeight);
+        return RValue_makeReal(runner->views[cameraId].viewHeight);
     }
     return RValue_makeReal(-1);
 }
@@ -1558,7 +1558,7 @@ static RValue builtinCameraGetViewTarget(VMContext* ctx, RValue* args, int32_t a
     Runner* runner = requireNotNullMessage(ctx->runner, "VM: camera_get_view_target called but no runner!");
     int32_t cameraId = RValue_toInt32(args[0]);
     if (cameraId >= 0 && MAX_VIEWS > cameraId) {
-        return RValue_makeReal((double) runner->views[cameraId].objectId);
+        return RValue_makeReal(runner->views[cameraId].objectId);
     }
     return RValue_makeReal(-1);
 }
@@ -1580,7 +1580,7 @@ static RValue cameraGetViewBorder(VMContext* ctx, RValue* args, int32_t argCount
     int32_t cameraId = RValue_toInt32(args[0]);
     if (cameraId >= 0 && MAX_VIEWS > cameraId) {
         RuntimeView v = runner->views[cameraId];
-        return RValue_makeReal((double) (wantY ? v.borderY : v.borderX));
+        return RValue_makeReal((wantY ? v.borderY : v.borderX));
     }
     return RValue_makeReal(-1);
 }
@@ -6694,7 +6694,7 @@ static RValue builtinJsonDecode(VMContext* ctx, RValue* args, int32_t argCount) 
 
     JsonReader_free(json);
 
-    return RValue_makeReal((double) mapIndex);
+    return RValue_makeReal(mapIndex);
 }
 
 static RValue builtinObjectGetSprite(VMContext* ctx, RValue* args, int32_t argCount) {
@@ -6705,7 +6705,7 @@ static RValue builtinObjectGetSprite(VMContext* ctx, RValue* args, int32_t argCo
 
     int32_t id = RValue_toInt32(args[0]);
 
-    return RValue_makeReal((double) ctx->dataWin->objt.objects[id].spriteId);
+    return RValue_makeReal(ctx->dataWin->objt.objects[id].spriteId);
 }
 
 // Shared implementation for font_add_sprite and font_add_sprite_ext
@@ -6939,7 +6939,7 @@ static RValue builtinAssetGetIndex(VMContext* ctx, RValue* args, int32_t argCoun
     }
 
     free(name);
-    return RValue_makeReal((double) -1);
+    return RValue_makeReal(-1);
 }
 
 // ===[ REGISTRATION ]===

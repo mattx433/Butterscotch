@@ -777,7 +777,9 @@ int main(int argc, char* argv[]) {
         // ===[ Game Logic ]===
         uint32_t roomSpeed = runner->currentRoom->speed;
 
+        u64 stepStartTime = GetTimerSystemTime();
         Runner_step(runner);
+        u64 stepEndTime = GetTimerSystemTime();
 
         gsKit_clear(gsGlobal, GS_SETREG_RGBAQ(0x00, 0x00, 0x00, 0x80, 0x00));
 
@@ -793,6 +795,7 @@ int main(int argc, char* argv[]) {
         }
 
         // Render views
+        u64 drawStartTime = GetTimerSystemTime();
         Room* activeRoom = runner->currentRoom;
         bool anyViewRendered = false;
 
@@ -843,6 +846,7 @@ int main(int argc, char* argv[]) {
             Runner_drawGUI(runner);
             renderer->vtable->endGUI(renderer);
         }
+        u64 drawEndTime = GetTimerSystemTime();
 
         runner->viewCurrent = 0;
 
@@ -852,15 +856,23 @@ int main(int argc, char* argv[]) {
         // This MUST be after Runner_draw because games CAN handle input in Draw events (e.g. Undertale's naming screen)
         RunnerKeyboard_beginFrame(runner->keyboard);
 
+        u64 audioStartTime = GetTimerSystemTime();
         // Update audio system (gain fading, stream to audsrv)
         float dt = 1.0f / (float) roomSpeed;
         if (0.0f > dt) dt = 0.0f;
         if (dt > 0.1f) dt = 0.1f;
         runner->audioSystem->vtable->update(runner->audioSystem, dt);
+        u64 audioEndTime = GetTimerSystemTime();
 
         u64 runnerEndTime = GetTimerSystemTime();
         u64 duration = runnerEndTime - frameStartTime;
+        u64 stepDuration = stepEndTime - stepStartTime;
+        u64 drawDuration = drawEndTime - drawStartTime;
+        u64 audioDuration = audioEndTime - audioStartTime;
         float tickTime = (float) duration / (float) (kBUSCLK / 1000);
+        float stepTime = (float) stepDuration / (float) (kBUSCLK / 1000);
+        float drawTime = (float) drawDuration / (float) (kBUSCLK / 1000);
+        float audioTime = (float) audioDuration / (float) (kBUSCLK / 1000);
 
         // ===[ Debug Overlay ]===
         if (debugOverlayState == 0 || debugOverlayState == 1) {
@@ -881,7 +893,7 @@ int main(int argc, char* argv[]) {
                 if (gsRenderer->eeCacheEntries[ai].atlasId >= 0) eeramAtlasCount++;
             }
 
-            snprintf(debugText, sizeof(debugText), "Tick: %.2fms\nFree: %d bytes\nVRAM Free: %lu bytes\nRoom Speed: %u%s\nAtlas: (%u, %u, %u)%s", tickTime, freeBytes, (unsigned long) vramFreeBytes, roomSpeed, speedCapRemoved ? " [UNCAPPED]" : "", vramAtlasCount, eeramAtlasCount, gsRenderer->atlasCount, gsRenderer->evictedAtlasUsedInCurrentFrame ? " [THRASHING]" : "");
+            snprintf(debugText, sizeof(debugText), "Tick: %.2fms\nStep: %.2fms\nDraw: %.2fms\nAudio: %.2fms\nFree: %d bytes\nVRAM Free: %lu bytes\nRoom Speed: %u%s\nAtlas: (%u, %u, %u)%s", tickTime, stepTime, drawTime, audioTime, freeBytes, (unsigned long) vramFreeBytes, roomSpeed, speedCapRemoved ? " [UNCAPPED]" : "", vramAtlasCount, eeramAtlasCount, gsRenderer->atlasCount, gsRenderer->evictedAtlasUsedInCurrentFrame ? " [THRASHING]" : "");
             gsKit_fontm_print_scaled(gsGlobal, gsFontM, 10.0f, 10.0f, 10, 0.6f, debugColor, debugText);
 
             if (debugOverlayState == 1) {
@@ -895,7 +907,7 @@ int main(int argc, char* argv[]) {
                     Profiler_reset(vm->profiler);
                     profilerFramesInWindow = 0;
                 }
-                float profilerY = 10.0f + (15.6f * 5.0f) + 6.0f;
+                float profilerY = 10.0f + (15.6f * 8.0f) + 6.0f;
 #ifdef ENABLE_VM_PROFILER
                 const char* profilerDisplay = profilerOverlayText[0] != '\0' ? profilerOverlayText : "GML Profiler (collecting...)";
 #else

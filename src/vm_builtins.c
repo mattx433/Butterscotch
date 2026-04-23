@@ -305,339 +305,477 @@ RValue VMBuiltins_getVariable(VMContext* ctx, int16_t builtinVarId, const char* 
     Runner* runner = (Runner*) ctx->runner;
     requireNotNull(runner);
 
-    // File system
-    if (builtinVarId == BUILTIN_VAR_WORKING_DIRECTORY) {
-        FileSystem* fs = runner->fileSystem;
-        char* path = fs->vtable->resolvePath(fs, "");
-        return RValue_makeOwnedString(path);
-    }
+    // In the past Butterscotch used cascading ifs for this, which in my opinion looked nicer AND GCC was converting the ifs into a jump table, so it was all well...
+    // ...until the code changed enough and the GCC heuristic thought "you know what? let's drop the jump table!"
+    // So that's why this (and setVariable) are a jump table
+    switch (builtinVarId) {
+        // File system
+        case BUILTIN_VAR_WORKING_DIRECTORY: {
+            FileSystem* fs = runner->fileSystem;
+            return RValue_makeOwnedString(fs->vtable->resolvePath(fs, ""));
+        }
 
-    // OS constants
-    if (builtinVarId == BUILTIN_VAR_OS_TYPE) return RValue_makeReal(runner->osType);
-    if (builtinVarId == BUILTIN_VAR_OS_UNKNOWN) return RValue_makeReal(OS_UNKNOWN);
-    if (builtinVarId == BUILTIN_VAR_OS_WIN32) return RValue_makeReal(OS_WINDOWS);
-    if (builtinVarId == BUILTIN_VAR_OS_WINDOWS) return RValue_makeReal(OS_WINDOWS);
-    if (builtinVarId == BUILTIN_VAR_OS_MACOSX) return RValue_makeReal(OS_MACOSX);
-    if (builtinVarId == BUILTIN_VAR_OS_PSP) return RValue_makeReal(OS_PSP);
-    if (builtinVarId == BUILTIN_VAR_OS_IOS) return RValue_makeReal(OS_IOS);
-    if (builtinVarId == BUILTIN_VAR_OS_ANDROID) return RValue_makeReal(OS_ANDROID);
-    if (builtinVarId == BUILTIN_VAR_OS_SYMBIAN) return RValue_makeReal(OS_SYMBIAN);
-    if (builtinVarId == BUILTIN_VAR_OS_LINUX) return RValue_makeReal(OS_LINUX);
-    if (builtinVarId == BUILTIN_VAR_OS_WINPHONE) return RValue_makeReal(OS_WINPHONE);
-    if (builtinVarId == BUILTIN_VAR_OS_TIZEN) return RValue_makeReal(OS_TIZEN);
-    if (builtinVarId == BUILTIN_VAR_OS_WIN8NATIVE) return RValue_makeReal(OS_WIN8NATIVE);
-    if (builtinVarId == BUILTIN_VAR_OS_WIIU) return RValue_makeReal(OS_WIIU);
-    if (builtinVarId == BUILTIN_VAR_OS_3DS) return RValue_makeReal(OS_3DS);
-    if (builtinVarId == BUILTIN_VAR_OS_PSVITA) return RValue_makeReal(OS_PSVITA);
-    if (builtinVarId == BUILTIN_VAR_OS_BB10) return RValue_makeReal(OS_BB10);
-    if (builtinVarId == BUILTIN_VAR_OS_PS4) return RValue_makeReal(OS_PS4);
-    if (builtinVarId == BUILTIN_VAR_OS_XBOXONE) return RValue_makeReal(OS_XBOXONE);
-    if (builtinVarId == BUILTIN_VAR_OS_PS3) return RValue_makeReal(OS_PS3);
-    if (builtinVarId == BUILTIN_VAR_OS_XBOX360) return RValue_makeReal(OS_XBOX360);
-    if (builtinVarId == BUILTIN_VAR_OS_UWP) return RValue_makeReal(OS_UWP);
-    if (builtinVarId == BUILTIN_VAR_OS_AMAZON) return RValue_makeReal(OS_AMAZON);
-    if (builtinVarId == BUILTIN_VAR_OS_SWITCH) return RValue_makeReal(OS_SWITCH);
-    if (builtinVarId == BUILTIN_VAR_OS_LLVM_WIN32) return RValue_makeReal(OS_LLVM_WIN32);
-    if (builtinVarId == BUILTIN_VAR_OS_LLVM_MACOSX) return RValue_makeReal(OS_LLVM_MACOSX);
-    if (builtinVarId == BUILTIN_VAR_OS_LLVM_PSP) return RValue_makeReal(OS_LLVM_PSP);
-    if (builtinVarId == BUILTIN_VAR_OS_LLVM_IOS) return RValue_makeReal(OS_LLVM_IOS);
-    if (builtinVarId == BUILTIN_VAR_OS_LLVM_ANDROID) return RValue_makeReal(OS_LLVM_ANDROID);
-    if (builtinVarId == BUILTIN_VAR_OS_LLVM_SYMBIAN) return RValue_makeReal(OS_LLVM_SYMBIAN);
-    if (builtinVarId == BUILTIN_VAR_OS_LLVM_LINUX) return RValue_makeReal(OS_LLVM_LINUX);
-    if (builtinVarId == BUILTIN_VAR_OS_LLVM_WINPHONE) return RValue_makeReal(OS_LLVM_WINPHONE);
+        // OS constants
+        case BUILTIN_VAR_OS_TYPE:
+            return RValue_makeReal(runner->osType);
+        case BUILTIN_VAR_OS_UNKNOWN:
+            return RValue_makeReal(OS_UNKNOWN);
+        case BUILTIN_VAR_OS_WIN32:
+            return RValue_makeReal(OS_WINDOWS);
+        case BUILTIN_VAR_OS_WINDOWS:
+            return RValue_makeReal(OS_WINDOWS);
+        case BUILTIN_VAR_OS_MACOSX:
+            return RValue_makeReal(OS_MACOSX);
+        case BUILTIN_VAR_OS_PSP:
+            return RValue_makeReal(OS_PSP);
+        case BUILTIN_VAR_OS_IOS:
+            return RValue_makeReal(OS_IOS);
+        case BUILTIN_VAR_OS_ANDROID:
+            return RValue_makeReal(OS_ANDROID);
+        case BUILTIN_VAR_OS_SYMBIAN:
+            return RValue_makeReal(OS_SYMBIAN);
+        case BUILTIN_VAR_OS_LINUX:
+            return RValue_makeReal(OS_LINUX);
+        case BUILTIN_VAR_OS_WINPHONE:
+            return RValue_makeReal(OS_WINPHONE);
+        case BUILTIN_VAR_OS_TIZEN:
+            return RValue_makeReal(OS_TIZEN);
+        case BUILTIN_VAR_OS_WIN8NATIVE:
+            return RValue_makeReal(OS_WIN8NATIVE);
+        case BUILTIN_VAR_OS_WIIU:
+            return RValue_makeReal(OS_WIIU);
+        case BUILTIN_VAR_OS_3DS:
+            return RValue_makeReal(OS_3DS);
+        case BUILTIN_VAR_OS_PSVITA:
+            return RValue_makeReal(OS_PSVITA);
+        case BUILTIN_VAR_OS_BB10:
+            return RValue_makeReal(OS_BB10);
+        case BUILTIN_VAR_OS_PS4:
+            return RValue_makeReal(OS_PS4);
+        case BUILTIN_VAR_OS_XBOXONE:
+            return RValue_makeReal(OS_XBOXONE);
+        case BUILTIN_VAR_OS_PS3:
+            return RValue_makeReal(OS_PS3);
+        case BUILTIN_VAR_OS_XBOX360:
+            return RValue_makeReal(OS_XBOX360);
+        case BUILTIN_VAR_OS_UWP:
+            return RValue_makeReal(OS_UWP);
+        case BUILTIN_VAR_OS_AMAZON:
+            return RValue_makeReal(OS_AMAZON);
+        case BUILTIN_VAR_OS_SWITCH:
+            return RValue_makeReal(OS_SWITCH);
+        case BUILTIN_VAR_OS_LLVM_WIN32:
+            return RValue_makeReal(OS_LLVM_WIN32);
+        case BUILTIN_VAR_OS_LLVM_MACOSX:
+            return RValue_makeReal(OS_LLVM_MACOSX);
+        case BUILTIN_VAR_OS_LLVM_PSP:
+            return RValue_makeReal(OS_LLVM_PSP);
+        case BUILTIN_VAR_OS_LLVM_IOS:
+            return RValue_makeReal(OS_LLVM_IOS);
+        case BUILTIN_VAR_OS_LLVM_ANDROID:
+            return RValue_makeReal(OS_LLVM_ANDROID);
+        case BUILTIN_VAR_OS_LLVM_SYMBIAN:
+            return RValue_makeReal(OS_LLVM_SYMBIAN);
+        case BUILTIN_VAR_OS_LLVM_LINUX:
+            return RValue_makeReal(OS_LLVM_LINUX);
+        case BUILTIN_VAR_OS_LLVM_WINPHONE:
+            return RValue_makeReal(OS_LLVM_WINPHONE);
 
-    // Per-instance properties
-    if (inst != nullptr) {
-        if (builtinVarId == BUILTIN_VAR_IMAGE_SPEED) return RValue_makeReal(inst->imageSpeed);
-        if (builtinVarId == BUILTIN_VAR_IMAGE_INDEX) return RValue_makeReal(inst->imageIndex);
-        if (builtinVarId == BUILTIN_VAR_IMAGE_XSCALE) return RValue_makeReal(inst->imageXscale);
-        if (builtinVarId == BUILTIN_VAR_IMAGE_YSCALE) return RValue_makeReal(inst->imageYscale);
-        if (builtinVarId == BUILTIN_VAR_IMAGE_ANGLE) return RValue_makeReal(inst->imageAngle);
-        if (builtinVarId == BUILTIN_VAR_IMAGE_ALPHA) return RValue_makeReal(inst->imageAlpha);
-        if (builtinVarId == BUILTIN_VAR_IMAGE_BLEND) return RValue_makeReal((GMLReal) inst->imageBlend);
-        if (builtinVarId == BUILTIN_VAR_IMAGE_NUMBER) {
+        // Per-instance properties
+        case BUILTIN_VAR_IMAGE_SPEED:
+            if (inst == nullptr) break;
+            return RValue_makeReal(inst->imageSpeed);
+        case BUILTIN_VAR_IMAGE_INDEX:
+            if (inst == nullptr) break;
+            return RValue_makeReal(inst->imageIndex);
+        case BUILTIN_VAR_IMAGE_XSCALE:
+            if (inst == nullptr) break;
+            return RValue_makeReal(inst->imageXscale);
+        case BUILTIN_VAR_IMAGE_YSCALE:
+            if (inst == nullptr) break;
+            return RValue_makeReal(inst->imageYscale);
+        case BUILTIN_VAR_IMAGE_ANGLE:
+            if (inst == nullptr) break;
+            return RValue_makeReal(inst->imageAngle);
+        case BUILTIN_VAR_IMAGE_ALPHA:
+            if (inst == nullptr) break;
+            return RValue_makeReal(inst->imageAlpha);
+        case BUILTIN_VAR_IMAGE_BLEND:
+            if (inst == nullptr) break;
+            return RValue_makeReal((GMLReal) inst->imageBlend);
+        case BUILTIN_VAR_IMAGE_NUMBER: {
+            if (inst == nullptr) break;
             if (inst->spriteIndex >= 0) {
                 Sprite* sprite = &ctx->runner->dataWin->sprt.sprites[inst->spriteIndex];
                 return RValue_makeReal((GMLReal) sprite->textureCount);
             }
             return RValue_makeReal(0.0);
         }
-        if (builtinVarId == BUILTIN_VAR_SPRITE_INDEX) return RValue_makeReal((GMLReal) inst->spriteIndex);
-        if (builtinVarId == BUILTIN_VAR_SPRITE_WIDTH) {
+        case BUILTIN_VAR_SPRITE_INDEX:
+            if (inst == nullptr) break;
+            return RValue_makeReal((GMLReal) inst->spriteIndex);
+        case BUILTIN_VAR_SPRITE_WIDTH: {
+            if (inst == nullptr) break;
             if (inst->spriteIndex >= 0 && runner->dataWin->sprt.count > (uint32_t) inst->spriteIndex) {
                 return RValue_makeReal((GMLReal) runner->dataWin->sprt.sprites[inst->spriteIndex].width * inst->imageXscale);
             }
             return RValue_makeReal(0.0);
         }
-        if (builtinVarId == BUILTIN_VAR_SPRITE_HEIGHT) {
+        case BUILTIN_VAR_SPRITE_HEIGHT: {
+            if (inst == nullptr) break;
             if (inst->spriteIndex >= 0 && runner->dataWin->sprt.count > (uint32_t) inst->spriteIndex) {
                 return RValue_makeReal((GMLReal) runner->dataWin->sprt.sprites[inst->spriteIndex].height * inst->imageYscale);
             }
             return RValue_makeReal(0.0);
         }
-        if (builtinVarId == BUILTIN_VAR_SPRITE_XOFFSET) {
+        case BUILTIN_VAR_SPRITE_XOFFSET: {
+            if (inst == nullptr) break;
             if (inst->spriteIndex >= 0 && runner->dataWin->sprt.count > (uint32_t) inst->spriteIndex) {
                 return RValue_makeReal((GMLReal) runner->dataWin->sprt.sprites[inst->spriteIndex].originX);
             }
             return RValue_makeReal(0.0);
         }
-        if (builtinVarId == BUILTIN_VAR_SPRITE_YOFFSET) {
+        case BUILTIN_VAR_SPRITE_YOFFSET: {
+            if (inst == nullptr) break;
             if (inst->spriteIndex >= 0 && runner->dataWin->sprt.count > (uint32_t) inst->spriteIndex) {
                 return RValue_makeReal((GMLReal) runner->dataWin->sprt.sprites[inst->spriteIndex].originY);
             }
             return RValue_makeReal(0.0);
         }
-        if (builtinVarId == BUILTIN_VAR_BBOX_LEFT || builtinVarId == BUILTIN_VAR_BBOX_RIGHT || builtinVarId == BUILTIN_VAR_BBOX_TOP || builtinVarId == BUILTIN_VAR_BBOX_BOTTOM) {
+        case BUILTIN_VAR_BBOX_LEFT: {
+            if (inst == nullptr) break;
             InstanceBBox bbox = Collision_computeBBox(runner->dataWin, inst);
-            if (bbox.valid) {
-                if (builtinVarId == BUILTIN_VAR_BBOX_LEFT) return RValue_makeReal(bbox.left);
-                if (builtinVarId == BUILTIN_VAR_BBOX_RIGHT) return RValue_makeReal(bbox.right);
-                if (builtinVarId == BUILTIN_VAR_BBOX_TOP) return RValue_makeReal(bbox.top);
-                return RValue_makeReal(bbox.bottom);
-            }
-            if (builtinVarId == BUILTIN_VAR_BBOX_LEFT || builtinVarId == BUILTIN_VAR_BBOX_RIGHT) return RValue_makeReal(inst->x);
-            return RValue_makeReal(inst->y);
+            return RValue_makeReal(bbox.valid ? bbox.left : inst->x);
         }
-        if (builtinVarId == BUILTIN_VAR_VISIBLE) return RValue_makeBool(inst->visible);
-        if (builtinVarId == BUILTIN_VAR_DEPTH) return RValue_makeReal((GMLReal) inst->depth);
-        if (builtinVarId == BUILTIN_VAR_X) return RValue_makeReal(inst->x);
-        if (builtinVarId == BUILTIN_VAR_Y) return RValue_makeReal(inst->y);
-        if (builtinVarId == BUILTIN_VAR_XPREVIOUS) return RValue_makeReal(inst->xprevious);
-        if (builtinVarId == BUILTIN_VAR_YPREVIOUS) return RValue_makeReal(inst->yprevious);
-        if (builtinVarId == BUILTIN_VAR_XSTART) return RValue_makeReal(inst->xstart);
-        if (builtinVarId == BUILTIN_VAR_YSTART) return RValue_makeReal(inst->ystart);
-        if (builtinVarId == BUILTIN_VAR_MASK_INDEX) return RValue_makeReal((GMLReal) inst->maskIndex);
-        if (builtinVarId == BUILTIN_VAR_ID) return RValue_makeReal((GMLReal) inst->instanceId);
-        if (builtinVarId == BUILTIN_VAR_OBJECT_INDEX) return RValue_makeReal((GMLReal) inst->objectIndex);
-        if (builtinVarId == BUILTIN_VAR_PERSISTENT) return RValue_makeBool(inst->persistent);
-        if (builtinVarId == BUILTIN_VAR_SOLID) return RValue_makeBool(inst->solid);
-        if (builtinVarId == BUILTIN_VAR_SPEED) return RValue_makeReal(inst->speed);
-        if (builtinVarId == BUILTIN_VAR_DIRECTION) return RValue_makeReal(inst->direction);
-        if (builtinVarId == BUILTIN_VAR_HSPEED) return RValue_makeReal(inst->hspeed);
-        if (builtinVarId == BUILTIN_VAR_VSPEED) return RValue_makeReal(inst->vspeed);
-        if (builtinVarId == BUILTIN_VAR_FRICTION) return RValue_makeReal(inst->friction);
-        if (builtinVarId == BUILTIN_VAR_GRAVITY) return RValue_makeReal(inst->gravity);
-        if (builtinVarId == BUILTIN_VAR_GRAVITY_DIRECTION) return RValue_makeReal(inst->gravityDirection);
-        if (builtinVarId == BUILTIN_VAR_ALARM) {
-            if (isValidAlarmIndex(arrayIndex)) {
-                return RValue_makeReal((GMLReal) inst->alarm[arrayIndex]);
-            }
+        case BUILTIN_VAR_BBOX_RIGHT: {
+            if (inst == nullptr) break;
+            InstanceBBox bbox = Collision_computeBBox(runner->dataWin, inst);
+            return RValue_makeReal(bbox.valid ? bbox.right : inst->x);
+        }
+        case BUILTIN_VAR_BBOX_TOP: {
+            if (inst == nullptr) break;
+            InstanceBBox bbox = Collision_computeBBox(runner->dataWin, inst);
+            return RValue_makeReal(bbox.valid ? bbox.top : inst->y);
+        }
+        case BUILTIN_VAR_BBOX_BOTTOM: {
+            if (inst == nullptr) break;
+            InstanceBBox bbox = Collision_computeBBox(runner->dataWin, inst);
+            return RValue_makeReal(bbox.valid ? bbox.bottom : inst->y);
+        }
+        case BUILTIN_VAR_VISIBLE:
+            if (inst == nullptr) break;
+            return RValue_makeBool(inst->visible);
+        case BUILTIN_VAR_DEPTH:
+            if (inst == nullptr) break;
+            return RValue_makeReal((GMLReal) inst->depth);
+        case BUILTIN_VAR_X:
+            if (inst == nullptr) break;
+            return RValue_makeReal(inst->x);
+        case BUILTIN_VAR_Y:
+            if (inst == nullptr) break;
+            return RValue_makeReal(inst->y);
+        case BUILTIN_VAR_XPREVIOUS:
+            if (inst == nullptr) break;
+            return RValue_makeReal(inst->xprevious);
+        case BUILTIN_VAR_YPREVIOUS:
+            if (inst == nullptr) break;
+            return RValue_makeReal(inst->yprevious);
+        case BUILTIN_VAR_XSTART:
+            if (inst == nullptr) break;
+            return RValue_makeReal(inst->xstart);
+        case BUILTIN_VAR_YSTART:
+            if (inst == nullptr) break;
+            return RValue_makeReal(inst->ystart);
+        case BUILTIN_VAR_MASK_INDEX:
+            if (inst == nullptr) break;
+            return RValue_makeReal((GMLReal) inst->maskIndex);
+        case BUILTIN_VAR_ID:
+            if (inst == nullptr) break;
+            return RValue_makeReal((GMLReal) inst->instanceId);
+        case BUILTIN_VAR_OBJECT_INDEX:
+            if (inst == nullptr) break;
+            return RValue_makeReal((GMLReal) inst->objectIndex);
+        case BUILTIN_VAR_PERSISTENT:
+            if (inst == nullptr) break;
+            return RValue_makeBool(inst->persistent);
+        case BUILTIN_VAR_SOLID:
+            if (inst == nullptr) break;
+            return RValue_makeBool(inst->solid);
+        case BUILTIN_VAR_SPEED:
+            if (inst == nullptr) break;
+            return RValue_makeReal(inst->speed);
+        case BUILTIN_VAR_DIRECTION:
+            if (inst == nullptr) break;
+            return RValue_makeReal(inst->direction);
+        case BUILTIN_VAR_HSPEED:
+            if (inst == nullptr) break;
+            return RValue_makeReal(inst->hspeed);
+        case BUILTIN_VAR_VSPEED:
+            if (inst == nullptr) break;
+            return RValue_makeReal(inst->vspeed);
+        case BUILTIN_VAR_FRICTION:
+            if (inst == nullptr) break;
+            return RValue_makeReal(inst->friction);
+        case BUILTIN_VAR_GRAVITY:
+            if (inst == nullptr) break;
+            return RValue_makeReal(inst->gravity);
+        case BUILTIN_VAR_GRAVITY_DIRECTION:
+            if (inst == nullptr) break;
+            return RValue_makeReal(inst->gravityDirection);
+        case BUILTIN_VAR_ALARM: {
+            if (inst == nullptr) break;
+            if (isValidAlarmIndex(arrayIndex)) return RValue_makeReal((GMLReal) inst->alarm[arrayIndex]);
             return RValue_makeReal(-1.0);
         }
 
         // Path instance variables
-        if (builtinVarId == BUILTIN_VAR_PATH_INDEX) return RValue_makeReal((GMLReal) inst->pathIndex);
-        if (builtinVarId == BUILTIN_VAR_PATH_POSITION) return RValue_makeReal(inst->pathPosition);
-        if (builtinVarId == BUILTIN_VAR_PATH_POSITIONPREVIOUS) return RValue_makeReal(inst->pathPositionPrevious);
-        if (builtinVarId == BUILTIN_VAR_PATH_SPEED) return RValue_makeReal(inst->pathSpeed);
-        if (builtinVarId == BUILTIN_VAR_PATH_SCALE) return RValue_makeReal(inst->pathScale);
-        if (builtinVarId == BUILTIN_VAR_PATH_ORIENTATION) return RValue_makeReal(inst->pathOrientation);
-        if (builtinVarId == BUILTIN_VAR_PATH_ENDACTION) return RValue_makeReal((GMLReal) inst->pathEndAction);
-    }
+        case BUILTIN_VAR_PATH_INDEX:
+            if (inst == nullptr) break;
+            return RValue_makeReal((GMLReal) inst->pathIndex);
+        case BUILTIN_VAR_PATH_POSITION:
+            if (inst == nullptr) break;
+            return RValue_makeReal(inst->pathPosition);
+        case BUILTIN_VAR_PATH_POSITIONPREVIOUS:
+            if (inst == nullptr) break;
+            return RValue_makeReal(inst->pathPositionPrevious);
+        case BUILTIN_VAR_PATH_SPEED:
+            if (inst == nullptr) break;
+            return RValue_makeReal(inst->pathSpeed);
+        case BUILTIN_VAR_PATH_SCALE:
+            if (inst == nullptr) break;
+            return RValue_makeReal(inst->pathScale);
+        case BUILTIN_VAR_PATH_ORIENTATION:
+            if (inst == nullptr) break;
+            return RValue_makeReal(inst->pathOrientation);
+        case BUILTIN_VAR_PATH_ENDACTION:
+            if (inst == nullptr) break;
+            return RValue_makeReal((GMLReal) inst->pathEndAction);
 
-    // Room properties
-    if (builtinVarId == BUILTIN_VAR_ROOM) return RValue_makeReal((GMLReal) runner->currentRoomIndex);
-    if (builtinVarId == BUILTIN_VAR_ROOM_FIRST) return RValue_makeReal((GMLReal) runner->dataWin->gen8.roomOrder[0]);
-    if (builtinVarId == BUILTIN_VAR_ROOM_SPEED) return RValue_makeReal((GMLReal) runner->currentRoom->speed);
-    if (builtinVarId == BUILTIN_VAR_ROOM_WIDTH) return RValue_makeReal((GMLReal) runner->currentRoom->width);
-    if (builtinVarId == BUILTIN_VAR_ROOM_HEIGHT) return RValue_makeReal((GMLReal) runner->currentRoom->height);
-    if (builtinVarId == BUILTIN_VAR_ROOM_PERSISTENT) return RValue_makeBool(runner->currentRoom->persistent);
-    if (builtinVarId == BUILTIN_VAR_VIEW_CURRENT) return RValue_makeReal((GMLReal) runner->viewCurrent);
-    if (builtinVarId == BUILTIN_VAR_VIEW_XVIEW) {
-        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].viewX);
-        return RValue_makeReal(0.0);
-    }
-    if (builtinVarId == BUILTIN_VAR_VIEW_YVIEW) {
-        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].viewY);
-        return RValue_makeReal(0.0);
-    }
-    if (builtinVarId == BUILTIN_VAR_VIEW_WVIEW) {
-        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].viewWidth);
-        return RValue_makeReal(0.0);
-    }
-    if (builtinVarId == BUILTIN_VAR_VIEW_HVIEW) {
-        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].viewHeight);
-        return RValue_makeReal(0.0);
-    }
-    if (builtinVarId == BUILTIN_VAR_VIEW_XPORT) {
-        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].portX);
-        return RValue_makeReal(0.0);
-    }
-    if (builtinVarId == BUILTIN_VAR_VIEW_YPORT) {
-        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].portY);
-        return RValue_makeReal(0.0);
-    }
-    if (builtinVarId == BUILTIN_VAR_VIEW_WPORT) {
-        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].portWidth);
-        return RValue_makeReal(0.0);
-    }
-    if (builtinVarId == BUILTIN_VAR_VIEW_HPORT) {
-        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].portHeight);
-        return RValue_makeReal(0.0);
-    }
-    if (builtinVarId == BUILTIN_VAR_VIEW_VISIBLE) {
-        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeBool(runner->views[arrayIndex].enabled);
-        return RValue_makeBool(false);
-    }
-    if (builtinVarId == BUILTIN_VAR_VIEW_ANGLE) {
-        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].viewAngle);
-        return RValue_makeReal(0.0);
-    }
-    if (builtinVarId == BUILTIN_VAR_VIEW_HBORDER) {
-        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].borderX);
-        return RValue_makeReal(0.0);
-    }
-    if (builtinVarId == BUILTIN_VAR_VIEW_VBORDER) {
-        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].borderY);
-        return RValue_makeReal(0.0);
-    }
-    if (builtinVarId == BUILTIN_VAR_VIEW_OBJECT) {
-        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].objectId);
-        return RValue_makeReal(-4.0);
-    }
-    if (builtinVarId == BUILTIN_VAR_VIEW_HSPEED) {
-        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].speedX);
-        return RValue_makeReal(0.0);
-    }
-    if (builtinVarId == BUILTIN_VAR_VIEW_VSPEED) {
-        if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].speedY);
-        return RValue_makeReal(0.0);
-    }
+        // Room properties
+        case BUILTIN_VAR_ROOM:
+            return RValue_makeReal((GMLReal) runner->currentRoomIndex);
+        case BUILTIN_VAR_ROOM_FIRST:
+            return RValue_makeReal((GMLReal) runner->dataWin->gen8.roomOrder[0]);
+        case BUILTIN_VAR_ROOM_SPEED:
+            return RValue_makeReal((GMLReal) runner->currentRoom->speed);
+        case BUILTIN_VAR_ROOM_WIDTH:
+            return RValue_makeReal((GMLReal) runner->currentRoom->width);
+        case BUILTIN_VAR_ROOM_HEIGHT:
+            return RValue_makeReal((GMLReal) runner->currentRoom->height);
+        case BUILTIN_VAR_ROOM_PERSISTENT:
+            return RValue_makeBool(runner->currentRoom->persistent);
 
-    // Background properties
-    if (builtinVarId == BUILTIN_VAR_BACKGROUND_VISIBLE) {
-        if (arrayIndex >= 0 && MAX_BACKGROUNDS > arrayIndex) return RValue_makeBool(runner->backgrounds[arrayIndex].visible);
-        return RValue_makeBool(false);
-    }
-    if (builtinVarId == BUILTIN_VAR_BACKGROUND_INDEX) {
-        if (arrayIndex >= 0 && MAX_BACKGROUNDS > arrayIndex) return RValue_makeReal((GMLReal) runner->backgrounds[arrayIndex].backgroundIndex);
-        return RValue_makeReal(-1.0);
-    }
-    if (builtinVarId == BUILTIN_VAR_BACKGROUND_X) {
-        if (arrayIndex >= 0 && MAX_BACKGROUNDS > arrayIndex) return RValue_makeReal((GMLReal) runner->backgrounds[arrayIndex].x);
-        return RValue_makeReal(0.0);
-    }
-    if (builtinVarId == BUILTIN_VAR_BACKGROUND_Y) {
-        if (arrayIndex >= 0 && MAX_BACKGROUNDS > arrayIndex) return RValue_makeReal((GMLReal) runner->backgrounds[arrayIndex].y);
-        return RValue_makeReal(0.0);
-    }
-    if (builtinVarId == BUILTIN_VAR_BACKGROUND_HSPEED) {
-        if (arrayIndex >= 0 && MAX_BACKGROUNDS > arrayIndex) return RValue_makeReal((GMLReal) runner->backgrounds[arrayIndex].speedX);
-        return RValue_makeReal(0.0);
-    }
-    if (builtinVarId == BUILTIN_VAR_BACKGROUND_VSPEED) {
-        if (arrayIndex >= 0 && MAX_BACKGROUNDS > arrayIndex) return RValue_makeReal((GMLReal) runner->backgrounds[arrayIndex].speedY);
-        return RValue_makeReal(0.0);
-    }
-    if (builtinVarId == BUILTIN_VAR_BACKGROUND_WIDTH) {
-        if (arrayIndex >= 0 && MAX_BACKGROUNDS > arrayIndex) {
-            int32_t tpagIndex = Renderer_resolveBackgroundTPAGIndex(runner->dataWin, runner->backgrounds[arrayIndex].backgroundIndex);
-            if (tpagIndex >= 0) return RValue_makeReal((GMLReal) runner->dataWin->tpag.items[tpagIndex].boundingWidth);
+        // View properties
+        case BUILTIN_VAR_VIEW_CURRENT:
+            return RValue_makeReal((GMLReal) runner->viewCurrent);
+        case BUILTIN_VAR_VIEW_XVIEW:
+            if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].viewX);
+            return RValue_makeReal(0.0);
+        case BUILTIN_VAR_VIEW_YVIEW:
+            if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].viewY);
+            return RValue_makeReal(0.0);
+        case BUILTIN_VAR_VIEW_WVIEW:
+            if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].viewWidth);
+            return RValue_makeReal(0.0);
+        case BUILTIN_VAR_VIEW_HVIEW:
+            if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].viewHeight);
+            return RValue_makeReal(0.0);
+        case BUILTIN_VAR_VIEW_XPORT:
+            if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].portX);
+            return RValue_makeReal(0.0);
+        case BUILTIN_VAR_VIEW_YPORT:
+            if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].portY);
+            return RValue_makeReal(0.0);
+        case BUILTIN_VAR_VIEW_WPORT:
+            if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].portWidth);
+            return RValue_makeReal(0.0);
+        case BUILTIN_VAR_VIEW_HPORT:
+            if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].portHeight);
+            return RValue_makeReal(0.0);
+        case BUILTIN_VAR_VIEW_VISIBLE:
+            if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeBool(runner->views[arrayIndex].enabled);
+            return RValue_makeBool(false);
+        case BUILTIN_VAR_VIEW_ANGLE:
+            if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].viewAngle);
+            return RValue_makeReal(0.0);
+        case BUILTIN_VAR_VIEW_HBORDER:
+            if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].borderX);
+            return RValue_makeReal(0.0);
+        case BUILTIN_VAR_VIEW_VBORDER:
+            if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].borderY);
+            return RValue_makeReal(0.0);
+        case BUILTIN_VAR_VIEW_OBJECT:
+            if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].objectId);
+            return RValue_makeReal(-4.0);
+        case BUILTIN_VAR_VIEW_HSPEED:
+            if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].speedX);
+            return RValue_makeReal(0.0);
+        case BUILTIN_VAR_VIEW_VSPEED:
+            if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) return RValue_makeReal((GMLReal) runner->views[arrayIndex].speedY);
+            return RValue_makeReal(0.0);
+
+        // Background properties
+        case BUILTIN_VAR_BACKGROUND_VISIBLE:
+            if (arrayIndex >= 0 && MAX_BACKGROUNDS > arrayIndex) return RValue_makeBool(runner->backgrounds[arrayIndex].visible);
+            return RValue_makeBool(false);
+        case BUILTIN_VAR_BACKGROUND_INDEX:
+            if (arrayIndex >= 0 && MAX_BACKGROUNDS > arrayIndex) return RValue_makeReal((GMLReal) runner->backgrounds[arrayIndex].backgroundIndex);
+            return RValue_makeReal(-1.0);
+        case BUILTIN_VAR_BACKGROUND_X:
+            if (arrayIndex >= 0 && MAX_BACKGROUNDS > arrayIndex) return RValue_makeReal((GMLReal) runner->backgrounds[arrayIndex].x);
+            return RValue_makeReal(0.0);
+        case BUILTIN_VAR_BACKGROUND_Y:
+            if (arrayIndex >= 0 && MAX_BACKGROUNDS > arrayIndex) return RValue_makeReal((GMLReal) runner->backgrounds[arrayIndex].y);
+            return RValue_makeReal(0.0);
+        case BUILTIN_VAR_BACKGROUND_HSPEED:
+            if (arrayIndex >= 0 && MAX_BACKGROUNDS > arrayIndex) return RValue_makeReal((GMLReal) runner->backgrounds[arrayIndex].speedX);
+            return RValue_makeReal(0.0);
+        case BUILTIN_VAR_BACKGROUND_VSPEED:
+            if (arrayIndex >= 0 && MAX_BACKGROUNDS > arrayIndex) return RValue_makeReal((GMLReal) runner->backgrounds[arrayIndex].speedY);
+            return RValue_makeReal(0.0);
+        case BUILTIN_VAR_BACKGROUND_WIDTH: {
+            if (arrayIndex >= 0 && MAX_BACKGROUNDS > arrayIndex) {
+                int32_t tpagIndex = Renderer_resolveBackgroundTPAGIndex(runner->dataWin, runner->backgrounds[arrayIndex].backgroundIndex);
+                if (tpagIndex >= 0) return RValue_makeReal((GMLReal) runner->dataWin->tpag.items[tpagIndex].boundingWidth);
+            }
+            return RValue_makeReal(0.0);
         }
-        return RValue_makeReal(0.0);
-    }
-    if (builtinVarId == BUILTIN_VAR_BACKGROUND_HEIGHT) {
-        if (arrayIndex >= 0 && MAX_BACKGROUNDS > arrayIndex) {
-            int32_t tpagIndex = Renderer_resolveBackgroundTPAGIndex(runner->dataWin, runner->backgrounds[arrayIndex].backgroundIndex);
-            if (tpagIndex >= 0) return RValue_makeReal((GMLReal) runner->dataWin->tpag.items[tpagIndex].boundingHeight);
+        case BUILTIN_VAR_BACKGROUND_HEIGHT: {
+            if (arrayIndex >= 0 && MAX_BACKGROUNDS > arrayIndex) {
+                int32_t tpagIndex = Renderer_resolveBackgroundTPAGIndex(runner->dataWin, runner->backgrounds[arrayIndex].backgroundIndex);
+                if (tpagIndex >= 0) return RValue_makeReal((GMLReal) runner->dataWin->tpag.items[tpagIndex].boundingHeight);
+            }
+            return RValue_makeReal(0.0);
         }
-        return RValue_makeReal(0.0);
-    }
-    if (builtinVarId == BUILTIN_VAR_BACKGROUND_ALPHA) {
-        if (arrayIndex >= 0 && MAX_BACKGROUNDS > arrayIndex) return RValue_makeReal((GMLReal) runner->backgrounds[arrayIndex].alpha);
-        return RValue_makeReal(1.0);
-    }
-    if (builtinVarId == BUILTIN_VAR_BACKGROUND_COLOR || builtinVarId == BUILTIN_VAR_BACKGROUND_COLOUR) {
-        return RValue_makeReal((GMLReal) runner->backgroundColor);
-    }
+        case BUILTIN_VAR_BACKGROUND_ALPHA:
+            if (arrayIndex >= 0 && MAX_BACKGROUNDS > arrayIndex) return RValue_makeReal((GMLReal) runner->backgrounds[arrayIndex].alpha);
+            return RValue_makeReal(1.0);
+        case BUILTIN_VAR_BACKGROUND_COLOR:
+        case BUILTIN_VAR_BACKGROUND_COLOUR:
+            return RValue_makeReal((GMLReal) runner->backgroundColor);
 
-    // Timing
-    if (builtinVarId == BUILTIN_VAR_CURRENT_TIME) {
-        #ifdef _WIN32
-        LARGE_INTEGER freq, counter;
-        QueryPerformanceFrequency(&freq);
-        QueryPerformanceCounter(&counter);
-        GMLReal ms = (GMLReal) counter.QuadPart / (GMLReal) freq.QuadPart * 1000.0;
-        #else
-        struct timespec ts;
-        clock_gettime(CLOCK_MONOTONIC, &ts);
-        GMLReal ms = (GMLReal) ts.tv_sec * 1000.0 + (GMLReal) ts.tv_nsec / 1000000.0;
-        #endif
-        return RValue_makeReal(ms);
-    }
-
-    // argument_count
-    if (builtinVarId == BUILTIN_VAR_ARGUMENT_COUNT) return RValue_makeReal((GMLReal) ctx->scriptArgCount);
-
-    // argument[N] - array-style access to script arguments
-    if (builtinVarId == BUILTIN_VAR_ARGUMENT) {
-        if (ctx->scriptArgs != nullptr && ctx->scriptArgCount > arrayIndex && arrayIndex >= 0) {
-            RValue val = ctx->scriptArgs[arrayIndex];
-            val.ownsString = false;
-            return val;
+        // Timing
+        case BUILTIN_VAR_CURRENT_TIME: {
+            #ifdef _WIN32
+            LARGE_INTEGER freq, counter;
+            QueryPerformanceFrequency(&freq);
+            QueryPerformanceCounter(&counter);
+            GMLReal ms = (GMLReal) counter.QuadPart / (GMLReal) freq.QuadPart * 1000.0;
+            #else
+            struct timespec ts;
+            clock_gettime(CLOCK_MONOTONIC, &ts);
+            GMLReal ms = (GMLReal) ts.tv_sec * 1000.0 + (GMLReal) ts.tv_nsec / 1000000.0;
+            #endif
+            return RValue_makeReal(ms);
         }
-        return RValue_makeUndefined();
-    }
 
-    // Argument variables (argument0..argument15)
-    if (builtinVarId >= BUILTIN_VAR_ARGUMENT0 && BUILTIN_VAR_ARGUMENT15 >= builtinVarId) {
-        int argNumber = builtinVarId - BUILTIN_VAR_ARGUMENT0;
-        if (ctx->scriptArgs != nullptr && ctx->scriptArgCount > argNumber) {
-            RValue val = ctx->scriptArgs[argNumber];
-            val.ownsString = false;
-            return val;
+        // Arguments
+        case BUILTIN_VAR_ARGUMENT_COUNT:
+            return RValue_makeReal((GMLReal) ctx->scriptArgCount);
+        case BUILTIN_VAR_ARGUMENT: {
+            if (ctx->scriptArgs != nullptr && ctx->scriptArgCount > arrayIndex && arrayIndex >= 0) {
+                RValue val = ctx->scriptArgs[arrayIndex];
+                val.ownsString = false;
+                return val;
+            }
+            return RValue_makeUndefined();
         }
-        return RValue_makeUndefined();
+        case BUILTIN_VAR_ARGUMENT0 ... BUILTIN_VAR_ARGUMENT15: {
+            int argNumber = builtinVarId - BUILTIN_VAR_ARGUMENT0;
+            if (ctx->scriptArgs != nullptr && ctx->scriptArgCount > argNumber) {
+                RValue val = ctx->scriptArgs[argNumber];
+                val.ownsString = false;
+                return val;
+            }
+            return RValue_makeUndefined();
+        }
+
+        // Keyboard
+        case BUILTIN_VAR_KEYBOARD_KEY:
+            return RValue_makeReal((GMLReal) runner->keyboard->lastKey);
+        case BUILTIN_VAR_KEYBOARD_LASTCHAR:
+            return RValue_makeString(runner->keyboard->lastChar);
+        case BUILTIN_VAR_KEYBOARD_LASTKEY:
+            return RValue_makeReal((GMLReal) runner->keyboard->lastKey);
+
+        // Surfaces
+        case BUILTIN_VAR_APPLICATION_SURFACE:
+            return RValue_makeReal(-1.0); // sentinel ID for the application surface
+
+        // Constants that GMS defines
+        case BUILTIN_VAR_TRUE:
+            return RValue_makeBool(true);
+        case BUILTIN_VAR_FALSE:
+            return RValue_makeBool(false);
+        case BUILTIN_VAR_PI:
+            return RValue_makeReal(3.14159265358979323846);
+        case BUILTIN_VAR_UNDEFINED:
+            return RValue_makeUndefined();
+
+        // Path action constants
+        case BUILTIN_VAR_PATH_ACTION_STOP:
+            return RValue_makeReal(0.0);
+        case BUILTIN_VAR_PATH_ACTION_RESTART:
+            return RValue_makeReal(1.0);
+        case BUILTIN_VAR_PATH_ACTION_CONTINUE:
+            return RValue_makeReal(2.0);
+        case BUILTIN_VAR_PATH_ACTION_REVERSE:
+            return RValue_makeReal(3.0);
+
+        // Buffer type constants
+        case BUILTIN_VAR_BUFFER_FIXED:
+            return RValue_makeReal(GML_BUFFER_FIXED);
+        case BUILTIN_VAR_BUFFER_GROW:
+            return RValue_makeReal(GML_BUFFER_GROW);
+        case BUILTIN_VAR_BUFFER_WRAP:
+            return RValue_makeReal(GML_BUFFER_WRAP);
+        case BUILTIN_VAR_BUFFER_FAST:
+            return RValue_makeReal(GML_BUFFER_FAST);
+
+        // Buffer data type constants
+        case BUILTIN_VAR_BUFFER_U8:
+            return RValue_makeReal(GML_BUFTYPE_U8);
+        case BUILTIN_VAR_BUFFER_S8:
+            return RValue_makeReal(GML_BUFTYPE_S8);
+        case BUILTIN_VAR_BUFFER_U16:
+            return RValue_makeReal(GML_BUFTYPE_U16);
+        case BUILTIN_VAR_BUFFER_S16:
+            return RValue_makeReal(GML_BUFTYPE_S16);
+        case BUILTIN_VAR_BUFFER_U32:
+            return RValue_makeReal(GML_BUFTYPE_U32);
+        case BUILTIN_VAR_BUFFER_S32:
+            return RValue_makeReal(GML_BUFTYPE_S32);
+        case BUILTIN_VAR_BUFFER_F16:
+            return RValue_makeReal(GML_BUFTYPE_F16);
+        case BUILTIN_VAR_BUFFER_F32:
+            return RValue_makeReal(GML_BUFTYPE_F32);
+        case BUILTIN_VAR_BUFFER_F64:
+            return RValue_makeReal(GML_BUFTYPE_F64);
+        case BUILTIN_VAR_BUFFER_BOOL:
+            return RValue_makeReal(GML_BUFTYPE_BOOL);
+        case BUILTIN_VAR_BUFFER_STRING:
+            return RValue_makeReal(GML_BUFTYPE_STRING);
+        case BUILTIN_VAR_BUFFER_U64:
+            return RValue_makeReal(GML_BUFTYPE_U64);
+        case BUILTIN_VAR_BUFFER_TEXT:
+            return RValue_makeReal(GML_BUFTYPE_TEXT);
+
+        // Buffer seek mode constants
+        case BUILTIN_VAR_BUFFER_SEEK_START:
+            return RValue_makeReal(GML_BUFFER_SEEK_START);
+        case BUILTIN_VAR_BUFFER_SEEK_RELATIVE:
+            return RValue_makeReal(GML_BUFFER_SEEK_RELATIVE);
+        case BUILTIN_VAR_BUFFER_SEEK_END:
+            return RValue_makeReal(GML_BUFFER_SEEK_END);
+
+        case BUILTIN_VAR_FPS:
+            return RValue_makeReal(ctx->dataWin->gen8.gms2FPS);
+        case BUILTIN_VAR_DEBUG_MODE:
+            return RValue_makeBool(false);
+
+        default:
+            break;
     }
-
-    // Keyboard variables
-    if (builtinVarId == BUILTIN_VAR_KEYBOARD_KEY) return RValue_makeReal((GMLReal) runner->keyboard->lastKey);
-    if (builtinVarId == BUILTIN_VAR_KEYBOARD_LASTCHAR) return RValue_makeString(runner->keyboard->lastChar);
-    if (builtinVarId == BUILTIN_VAR_KEYBOARD_LASTKEY) return RValue_makeReal((GMLReal) runner->keyboard->lastKey);
-
-    // Surfaces
-    if (builtinVarId == BUILTIN_VAR_APPLICATION_SURFACE) return RValue_makeReal(-1.0); // sentinel ID for the application surface
-
-    // Constants that GMS defines
-    if (builtinVarId == BUILTIN_VAR_TRUE) return RValue_makeBool(true);
-    if (builtinVarId == BUILTIN_VAR_FALSE) return RValue_makeBool(false);
-    if (builtinVarId == BUILTIN_VAR_PI) return RValue_makeReal(3.14159265358979323846);
-    if (builtinVarId == BUILTIN_VAR_UNDEFINED) return RValue_makeUndefined();
-
-    // Path action constants
-    if (builtinVarId == BUILTIN_VAR_PATH_ACTION_STOP) return RValue_makeReal(0.0);
-    if (builtinVarId == BUILTIN_VAR_PATH_ACTION_RESTART) return RValue_makeReal(1.0);
-    if (builtinVarId == BUILTIN_VAR_PATH_ACTION_CONTINUE) return RValue_makeReal(2.0);
-    if (builtinVarId == BUILTIN_VAR_PATH_ACTION_REVERSE) return RValue_makeReal(3.0);
-
-    // Buffer type constants
-    if (builtinVarId == BUILTIN_VAR_BUFFER_FIXED) return RValue_makeReal(GML_BUFFER_FIXED);
-    if (builtinVarId == BUILTIN_VAR_BUFFER_GROW) return RValue_makeReal(GML_BUFFER_GROW);
-    if (builtinVarId == BUILTIN_VAR_BUFFER_WRAP) return RValue_makeReal(GML_BUFFER_WRAP);
-    if (builtinVarId == BUILTIN_VAR_BUFFER_FAST) return RValue_makeReal(GML_BUFFER_FAST);
-
-    // Buffer data type constants
-    if (builtinVarId == BUILTIN_VAR_BUFFER_U8) return RValue_makeReal(GML_BUFTYPE_U8);
-    if (builtinVarId == BUILTIN_VAR_BUFFER_S8) return RValue_makeReal(GML_BUFTYPE_S8);
-    if (builtinVarId == BUILTIN_VAR_BUFFER_U16) return RValue_makeReal(GML_BUFTYPE_U16);
-    if (builtinVarId == BUILTIN_VAR_BUFFER_S16) return RValue_makeReal(GML_BUFTYPE_S16);
-    if (builtinVarId == BUILTIN_VAR_BUFFER_U32) return RValue_makeReal(GML_BUFTYPE_U32);
-    if (builtinVarId == BUILTIN_VAR_BUFFER_S32) return RValue_makeReal(GML_BUFTYPE_S32);
-    if (builtinVarId == BUILTIN_VAR_BUFFER_F16) return RValue_makeReal(GML_BUFTYPE_F16);
-    if (builtinVarId == BUILTIN_VAR_BUFFER_F32) return RValue_makeReal(GML_BUFTYPE_F32);
-    if (builtinVarId == BUILTIN_VAR_BUFFER_F64) return RValue_makeReal(GML_BUFTYPE_F64);
-    if (builtinVarId == BUILTIN_VAR_BUFFER_BOOL) return RValue_makeReal(GML_BUFTYPE_BOOL);
-    if (builtinVarId == BUILTIN_VAR_BUFFER_STRING) return RValue_makeReal(GML_BUFTYPE_STRING);
-    if (builtinVarId == BUILTIN_VAR_BUFFER_U64) return RValue_makeReal(GML_BUFTYPE_U64);
-    if (builtinVarId == BUILTIN_VAR_BUFFER_TEXT) return RValue_makeReal(GML_BUFTYPE_TEXT);
-
-    // Buffer seek mode constants
-    if (builtinVarId == BUILTIN_VAR_BUFFER_SEEK_START) return RValue_makeReal(GML_BUFFER_SEEK_START);
-    if (builtinVarId == BUILTIN_VAR_BUFFER_SEEK_RELATIVE) return RValue_makeReal(GML_BUFFER_SEEK_RELATIVE);
-    if (builtinVarId == BUILTIN_VAR_BUFFER_SEEK_END) return RValue_makeReal(GML_BUFFER_SEEK_END);
-
-    if (builtinVarId == BUILTIN_VAR_FPS) return RValue_makeReal(ctx->dataWin->gen8.gms2FPS);
-    if (builtinVarId == BUILTIN_VAR_DEBUG_MODE) return RValue_makeBool(false);
 
     fprintf(stderr, "VM: Unhandled built-in variable read '%s' (arrayIndex=%d)\n", name, arrayIndex);
     return RValue_makeReal(0.0);
@@ -648,41 +786,121 @@ void VMBuiltins_setVariable(VMContext* ctx, int16_t builtinVarId, const char* na
     Runner* runner = (Runner*) requireNotNullMessage(ctx->runner, "VM: setVariable called but no runner!");
     requireNotNull(runner);
 
-    // Per-instance properties
-    if (inst != nullptr) {
-        if (builtinVarId == BUILTIN_VAR_IMAGE_SPEED) { inst->imageSpeed = (float) RValue_toReal(val); return; }
-        if (builtinVarId == BUILTIN_VAR_IMAGE_INDEX) { inst->imageIndex = (float) RValue_toReal(val); return; }
-        if (builtinVarId == BUILTIN_VAR_IMAGE_XSCALE) { inst->imageXscale = (float) RValue_toReal(val); return; }
-        if (builtinVarId == BUILTIN_VAR_IMAGE_YSCALE) { inst->imageYscale = (float) RValue_toReal(val); return; }
-        if (builtinVarId == BUILTIN_VAR_IMAGE_ANGLE) { inst->imageAngle = (float) RValue_toReal(val); return; }
-        if (builtinVarId == BUILTIN_VAR_IMAGE_ALPHA) { inst->imageAlpha = (float) RValue_toReal(val); return; }
-        if (builtinVarId == BUILTIN_VAR_IMAGE_BLEND) { inst->imageBlend = (uint32_t) RValue_toReal(val); return; }
-        if (builtinVarId == BUILTIN_VAR_SPRITE_INDEX) { inst->spriteIndex = RValue_toInt32(val); return; }
-        if (builtinVarId == BUILTIN_VAR_VISIBLE) { inst->visible = RValue_toBool(val); return; }
-        if (builtinVarId == BUILTIN_VAR_DEPTH) { inst->depth = RValue_toInt32(val); return; }
-        if (builtinVarId == BUILTIN_VAR_X) { inst->x = (float) RValue_toReal(val); return; }
-        if (builtinVarId == BUILTIN_VAR_Y) { inst->y = (float) RValue_toReal(val); return; }
-        if (builtinVarId == BUILTIN_VAR_PERSISTENT) { inst->persistent = RValue_toBool(val); return; }
-        if (builtinVarId == BUILTIN_VAR_SOLID) { inst->solid = RValue_toBool(val); return; }
-        if (builtinVarId == BUILTIN_VAR_XPREVIOUS) { inst->xprevious = (float) RValue_toReal(val); return; }
-        if (builtinVarId == BUILTIN_VAR_YPREVIOUS) { inst->yprevious = (float) RValue_toReal(val); return; }
-        if (builtinVarId == BUILTIN_VAR_XSTART) { inst->xstart = (float) RValue_toReal(val); return; }
-        if (builtinVarId == BUILTIN_VAR_YSTART) { inst->ystart = (float) RValue_toReal(val); return; }
-        if (builtinVarId == BUILTIN_VAR_MASK_INDEX) { inst->maskIndex = RValue_toInt32(val); return; }
-        if (builtinVarId == BUILTIN_VAR_SPEED) { inst->speed = (float) RValue_toReal(val); Instance_computeComponentsFromSpeed(inst); return; }
-        if (builtinVarId == BUILTIN_VAR_DIRECTION) {
+    switch (builtinVarId) {
+        // Per-instance properties
+        case BUILTIN_VAR_IMAGE_SPEED:
+            if (inst == nullptr) break;
+            inst->imageSpeed = (float) RValue_toReal(val);
+            return;
+        case BUILTIN_VAR_IMAGE_INDEX:
+            if (inst == nullptr) break;
+            inst->imageIndex = (float) RValue_toReal(val);
+            return;
+        case BUILTIN_VAR_IMAGE_XSCALE:
+            if (inst == nullptr) break;
+            inst->imageXscale = (float) RValue_toReal(val);
+            return;
+        case BUILTIN_VAR_IMAGE_YSCALE:
+            if (inst == nullptr) break;
+            inst->imageYscale = (float) RValue_toReal(val);
+            return;
+        case BUILTIN_VAR_IMAGE_ANGLE:
+            if (inst == nullptr) break;
+            inst->imageAngle = (float) RValue_toReal(val);
+            return;
+        case BUILTIN_VAR_IMAGE_ALPHA:
+            if (inst == nullptr) break;
+            inst->imageAlpha = (float) RValue_toReal(val);
+            return;
+        case BUILTIN_VAR_IMAGE_BLEND:
+            if (inst == nullptr) break;
+            inst->imageBlend = (uint32_t) RValue_toReal(val);
+            return;
+        case BUILTIN_VAR_SPRITE_INDEX:
+            if (inst == nullptr) break;
+            inst->spriteIndex = RValue_toInt32(val);
+            return;
+        case BUILTIN_VAR_VISIBLE:
+            if (inst == nullptr) break;
+            inst->visible = RValue_toBool(val);
+            return;
+        case BUILTIN_VAR_DEPTH:
+            if (inst == nullptr) break;
+            inst->depth = RValue_toInt32(val);
+            return;
+        case BUILTIN_VAR_X:
+            if (inst == nullptr) break;
+            inst->x = (float) RValue_toReal(val);
+            return;
+        case BUILTIN_VAR_Y:
+            if (inst == nullptr) break;
+            inst->y = (float) RValue_toReal(val);
+            return;
+        case BUILTIN_VAR_PERSISTENT:
+            if (inst == nullptr) break;
+            inst->persistent = RValue_toBool(val);
+            return;
+        case BUILTIN_VAR_SOLID:
+            if (inst == nullptr) break;
+            inst->solid = RValue_toBool(val);
+            return;
+        case BUILTIN_VAR_XPREVIOUS:
+            if (inst == nullptr) break;
+            inst->xprevious = (float) RValue_toReal(val);
+            return;
+        case BUILTIN_VAR_YPREVIOUS:
+            if (inst == nullptr) break;
+            inst->yprevious = (float) RValue_toReal(val);
+            return;
+        case BUILTIN_VAR_XSTART:
+            if (inst == nullptr) break;
+            inst->xstart = (float) RValue_toReal(val);
+            return;
+        case BUILTIN_VAR_YSTART:
+            if (inst == nullptr) break;
+            inst->ystart = (float) RValue_toReal(val);
+            return;
+        case BUILTIN_VAR_MASK_INDEX:
+            if (inst == nullptr) break;
+            inst->maskIndex = RValue_toInt32(val);
+            return;
+        case BUILTIN_VAR_SPEED:
+            if (inst == nullptr) break;
+            inst->speed = (float) RValue_toReal(val);
+            Instance_computeComponentsFromSpeed(inst);
+            return;
+        case BUILTIN_VAR_DIRECTION: {
+            if (inst == nullptr) break;
             GMLReal d = GMLReal_fmod(RValue_toReal(val), 360.0);
             if (d < 0.0) d += 360.0;
             inst->direction = (float) d;
             Instance_computeComponentsFromSpeed(inst);
             return;
         }
-        if (builtinVarId == BUILTIN_VAR_HSPEED) { inst->hspeed = (float) RValue_toReal(val); Instance_computeSpeedFromComponents(inst); return; }
-        if (builtinVarId == BUILTIN_VAR_VSPEED) { inst->vspeed = (float) RValue_toReal(val); Instance_computeSpeedFromComponents(inst); return; }
-        if (builtinVarId == BUILTIN_VAR_FRICTION) { inst->friction = (float) RValue_toReal(val); return; }
-        if (builtinVarId == BUILTIN_VAR_GRAVITY) { inst->gravity = (float) RValue_toReal(val); return; }
-        if (builtinVarId == BUILTIN_VAR_GRAVITY_DIRECTION) { inst->gravityDirection = (float) RValue_toReal(val); return; }
-        if (builtinVarId == BUILTIN_VAR_ALARM) {
+        case BUILTIN_VAR_HSPEED:
+            if (inst == nullptr) break;
+            inst->hspeed = (float) RValue_toReal(val);
+            Instance_computeSpeedFromComponents(inst);
+            return;
+        case BUILTIN_VAR_VSPEED:
+            if (inst == nullptr) break;
+            inst->vspeed = (float) RValue_toReal(val);
+            Instance_computeSpeedFromComponents(inst);
+            return;
+        case BUILTIN_VAR_FRICTION:
+            if (inst == nullptr) break;
+            inst->friction = (float) RValue_toReal(val);
+            return;
+        case BUILTIN_VAR_GRAVITY:
+            if (inst == nullptr) break;
+            inst->gravity = (float) RValue_toReal(val);
+            return;
+        case BUILTIN_VAR_GRAVITY_DIRECTION:
+            if (inst == nullptr) break;
+            inst->gravityDirection = (float) RValue_toReal(val);
+            return;
+        case BUILTIN_VAR_ALARM: {
+            if (inst == nullptr) break;
             if (isValidAlarmIndex(arrayIndex)) {
                 int32_t newValue = RValue_toInt32(val);
 
@@ -698,7 +916,8 @@ void VMBuiltins_setVariable(VMContext* ctx, int16_t builtinVarId, const char* na
         }
 
         // Path instance variables (writable)
-        if (builtinVarId == BUILTIN_VAR_PATH_POSITION) {
+        case BUILTIN_VAR_PATH_POSITION: {
+            if (inst == nullptr) break;
             // Native GMS runner clamps path_position to [0.0, 1.0] on set
             float pos = (float) RValue_toReal(val);
             if (pos < 0.0f) pos = 0.0f;
@@ -706,91 +925,158 @@ void VMBuiltins_setVariable(VMContext* ctx, int16_t builtinVarId, const char* na
             inst->pathPosition = pos;
             return;
         }
-        if (builtinVarId == BUILTIN_VAR_PATH_SPEED) { inst->pathSpeed = (float) RValue_toReal(val); return; }
-        if (builtinVarId == BUILTIN_VAR_PATH_SCALE) { inst->pathScale = (float) RValue_toReal(val); return; }
-        if (builtinVarId == BUILTIN_VAR_PATH_ORIENTATION) { inst->pathOrientation = (float) RValue_toReal(val); return; }
-        if (builtinVarId == BUILTIN_VAR_PATH_ENDACTION) { inst->pathEndAction = RValue_toInt32(val); return; }
-    }
+        case BUILTIN_VAR_PATH_SPEED:
+            if (inst == nullptr) break;
+            inst->pathSpeed = (float) RValue_toReal(val);
+            return;
+        case BUILTIN_VAR_PATH_SCALE:
+            if (inst == nullptr) break;
+            inst->pathScale = (float) RValue_toReal(val);
+            return;
+        case BUILTIN_VAR_PATH_ORIENTATION:
+            if (inst == nullptr) break;
+            inst->pathOrientation = (float) RValue_toReal(val);
+            return;
+        case BUILTIN_VAR_PATH_ENDACTION:
+            if (inst == nullptr) break;
+            inst->pathEndAction = RValue_toInt32(val);
+            return;
 
-    // Keyboard variables
-    if (builtinVarId == BUILTIN_VAR_KEYBOARD_KEY) {
-        runner->keyboard->lastKey = RValue_toInt32(val);
-        return;
-    }
-    if (builtinVarId == BUILTIN_VAR_KEYBOARD_LASTCHAR) {
-        runner->keyboard->lastChar[0] = val.string[0];
-        return;
-    }
-    if (builtinVarId == BUILTIN_VAR_KEYBOARD_LASTKEY) {
-        runner->keyboard->lastKey = RValue_toInt32(val);
-        return;
-    }
+        // Keyboard variables
+        case BUILTIN_VAR_KEYBOARD_KEY:
+            runner->keyboard->lastKey = RValue_toInt32(val);
+            return;
+        case BUILTIN_VAR_KEYBOARD_LASTCHAR:
+            runner->keyboard->lastChar[0] = val.string[0];
+            return;
+        case BUILTIN_VAR_KEYBOARD_LASTKEY:
+            runner->keyboard->lastKey = RValue_toInt32(val);
+            return;
 
-    // View properties
-    if (builtinVarId == BUILTIN_VAR_VIEW_XVIEW) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->views[arrayIndex].viewX = RValue_toInt32(val); } return; }
-    if (builtinVarId == BUILTIN_VAR_VIEW_YVIEW) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->views[arrayIndex].viewY = RValue_toInt32(val); } return; }
-    if (builtinVarId == BUILTIN_VAR_VIEW_WVIEW) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->views[arrayIndex].viewWidth = RValue_toInt32(val); } return; }
-    if (builtinVarId == BUILTIN_VAR_VIEW_HVIEW) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->views[arrayIndex].viewHeight = RValue_toInt32(val); } return; }
-    if (builtinVarId == BUILTIN_VAR_VIEW_XPORT) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->views[arrayIndex].portX = RValue_toInt32(val); } return; }
-    if (builtinVarId == BUILTIN_VAR_VIEW_YPORT) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->views[arrayIndex].portY = RValue_toInt32(val); } return; }
-    if (builtinVarId == BUILTIN_VAR_VIEW_WPORT) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->views[arrayIndex].portWidth = RValue_toInt32(val); } return; }
-    if (builtinVarId == BUILTIN_VAR_VIEW_HPORT) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->views[arrayIndex].portHeight = RValue_toInt32(val); } return; }
-    if (builtinVarId == BUILTIN_VAR_VIEW_VISIBLE) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->views[arrayIndex].enabled = RValue_toBool(val); } return; }
-    if (builtinVarId == BUILTIN_VAR_VIEW_ANGLE) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->views[arrayIndex].viewAngle = (float) RValue_toReal(val); } return; }
-    if (builtinVarId == BUILTIN_VAR_VIEW_HBORDER) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->views[arrayIndex].borderX = RValue_toInt32(val); } return; }
-    if (builtinVarId == BUILTIN_VAR_VIEW_VBORDER) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->views[arrayIndex].borderY = RValue_toInt32(val); } return; }
-    if (builtinVarId == BUILTIN_VAR_VIEW_OBJECT) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->views[arrayIndex].objectId = RValue_toInt32(val); } return; }
-    if (builtinVarId == BUILTIN_VAR_VIEW_HSPEED) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->views[arrayIndex].speedX = RValue_toInt32(val); } return; }
-    if (builtinVarId == BUILTIN_VAR_VIEW_VSPEED) { if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) { runner->views[arrayIndex].speedY = RValue_toInt32(val); } return; }
+        // View properties
+        case BUILTIN_VAR_VIEW_XVIEW:
+            if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) runner->views[arrayIndex].viewX = RValue_toInt32(val);
+            return;
+        case BUILTIN_VAR_VIEW_YVIEW:
+            if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) runner->views[arrayIndex].viewY = RValue_toInt32(val);
+            return;
+        case BUILTIN_VAR_VIEW_WVIEW:
+            if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) runner->views[arrayIndex].viewWidth = RValue_toInt32(val);
+            return;
+        case BUILTIN_VAR_VIEW_HVIEW:
+            if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) runner->views[arrayIndex].viewHeight = RValue_toInt32(val);
+            return;
+        case BUILTIN_VAR_VIEW_XPORT:
+            if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) runner->views[arrayIndex].portX = RValue_toInt32(val);
+            return;
+        case BUILTIN_VAR_VIEW_YPORT:
+            if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) runner->views[arrayIndex].portY = RValue_toInt32(val);
+            return;
+        case BUILTIN_VAR_VIEW_WPORT:
+            if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) runner->views[arrayIndex].portWidth = RValue_toInt32(val);
+            return;
+        case BUILTIN_VAR_VIEW_HPORT:
+            if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) runner->views[arrayIndex].portHeight = RValue_toInt32(val);
+            return;
+        case BUILTIN_VAR_VIEW_VISIBLE:
+            if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) runner->views[arrayIndex].enabled = RValue_toBool(val);
+            return;
+        case BUILTIN_VAR_VIEW_ANGLE:
+            if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) runner->views[arrayIndex].viewAngle = (float) RValue_toReal(val);
+            return;
+        case BUILTIN_VAR_VIEW_HBORDER:
+            if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) runner->views[arrayIndex].borderX = RValue_toInt32(val);
+            return;
+        case BUILTIN_VAR_VIEW_VBORDER:
+            if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) runner->views[arrayIndex].borderY = RValue_toInt32(val);
+            return;
+        case BUILTIN_VAR_VIEW_OBJECT:
+            if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) runner->views[arrayIndex].objectId = RValue_toInt32(val);
+            return;
+        case BUILTIN_VAR_VIEW_HSPEED:
+            if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) runner->views[arrayIndex].speedX = RValue_toInt32(val);
+            return;
+        case BUILTIN_VAR_VIEW_VSPEED:
+            if (arrayIndex >= 0 && MAX_VIEWS > arrayIndex) runner->views[arrayIndex].speedY = RValue_toInt32(val);
+            return;
 
-    // Background properties
-    if (builtinVarId == BUILTIN_VAR_BACKGROUND_VISIBLE) { if (arrayIndex >= 0 && MAX_BACKGROUNDS > arrayIndex) runner->backgrounds[arrayIndex].visible = RValue_toBool(val); return; }
-    if (builtinVarId == BUILTIN_VAR_BACKGROUND_INDEX) { if (arrayIndex >= 0 && MAX_BACKGROUNDS > arrayIndex) runner->backgrounds[arrayIndex].backgroundIndex = RValue_toInt32(val); return; }
-    if (builtinVarId == BUILTIN_VAR_BACKGROUND_X) { if (arrayIndex >= 0 && MAX_BACKGROUNDS > arrayIndex) runner->backgrounds[arrayIndex].x = (float) RValue_toReal(val); return; }
-    if (builtinVarId == BUILTIN_VAR_BACKGROUND_Y) { if (arrayIndex >= 0 && MAX_BACKGROUNDS > arrayIndex) runner->backgrounds[arrayIndex].y = (float) RValue_toReal(val); return; }
-    if (builtinVarId == BUILTIN_VAR_BACKGROUND_HSPEED) { if (arrayIndex >= 0 && MAX_BACKGROUNDS > arrayIndex) runner->backgrounds[arrayIndex].speedX = (float) RValue_toReal(val); return; }
-    if (builtinVarId == BUILTIN_VAR_BACKGROUND_VSPEED) { if (arrayIndex >= 0 && MAX_BACKGROUNDS > arrayIndex) runner->backgrounds[arrayIndex].speedY = (float) RValue_toReal(val); return; }
-    if (builtinVarId == BUILTIN_VAR_BACKGROUND_ALPHA) { if (arrayIndex >= 0 && MAX_BACKGROUNDS > arrayIndex) runner->backgrounds[arrayIndex].alpha = (float) RValue_toReal(val); return; }
-    if (builtinVarId == BUILTIN_VAR_BACKGROUND_COLOR || builtinVarId == BUILTIN_VAR_BACKGROUND_COLOUR) {
-        runner->backgroundColor = (uint32_t) RValue_toInt32(val);
-        return;
-    }
+        // Background properties
+        case BUILTIN_VAR_BACKGROUND_VISIBLE:
+            if (arrayIndex >= 0 && MAX_BACKGROUNDS > arrayIndex) runner->backgrounds[arrayIndex].visible = RValue_toBool(val);
+            return;
+        case BUILTIN_VAR_BACKGROUND_INDEX:
+            if (arrayIndex >= 0 && MAX_BACKGROUNDS > arrayIndex) runner->backgrounds[arrayIndex].backgroundIndex = RValue_toInt32(val);
+            return;
+        case BUILTIN_VAR_BACKGROUND_X:
+            if (arrayIndex >= 0 && MAX_BACKGROUNDS > arrayIndex) runner->backgrounds[arrayIndex].x = (float) RValue_toReal(val);
+            return;
+        case BUILTIN_VAR_BACKGROUND_Y:
+            if (arrayIndex >= 0 && MAX_BACKGROUNDS > arrayIndex) runner->backgrounds[arrayIndex].y = (float) RValue_toReal(val);
+            return;
+        case BUILTIN_VAR_BACKGROUND_HSPEED:
+            if (arrayIndex >= 0 && MAX_BACKGROUNDS > arrayIndex) runner->backgrounds[arrayIndex].speedX = (float) RValue_toReal(val);
+            return;
+        case BUILTIN_VAR_BACKGROUND_VSPEED:
+            if (arrayIndex >= 0 && MAX_BACKGROUNDS > arrayIndex) runner->backgrounds[arrayIndex].speedY = (float) RValue_toReal(val);
+            return;
+        case BUILTIN_VAR_BACKGROUND_ALPHA:
+            if (arrayIndex >= 0 && MAX_BACKGROUNDS > arrayIndex) runner->backgrounds[arrayIndex].alpha = (float) RValue_toReal(val);
+            return;
+        case BUILTIN_VAR_BACKGROUND_COLOR:
+        case BUILTIN_VAR_BACKGROUND_COLOUR:
+            runner->backgroundColor = (uint32_t) RValue_toInt32(val);
+            return;
 
-    // Room properties
-    if (builtinVarId == BUILTIN_VAR_ROOM) { runner->pendingRoom = RValue_toInt32(val); return; }
-    if (builtinVarId == BUILTIN_VAR_ROOM_PERSISTENT) { runner->currentRoom->persistent = RValue_toBool(val); return; }
-    if (builtinVarId == BUILTIN_VAR_ROOM_WIDTH) { runner->currentRoom->width = (uint32_t) RValue_toInt32(val); return; }
-    if (builtinVarId == BUILTIN_VAR_ROOM_HEIGHT) { runner->currentRoom->height = (uint32_t) RValue_toInt32(val); return; }
-    if (builtinVarId == BUILTIN_VAR_ROOM_SPEED) { runner->currentRoom->speed = (uint32_t) RValue_toInt32(val); return; }
+        // Room properties
+        case BUILTIN_VAR_ROOM:
+            runner->pendingRoom = RValue_toInt32(val);
+            return;
+        case BUILTIN_VAR_ROOM_PERSISTENT:
+            runner->currentRoom->persistent = RValue_toBool(val);
+            return;
+        case BUILTIN_VAR_ROOM_WIDTH:
+            runner->currentRoom->width = (uint32_t) RValue_toInt32(val);
+            return;
+        case BUILTIN_VAR_ROOM_HEIGHT:
+            runner->currentRoom->height = (uint32_t) RValue_toInt32(val);
+            return;
+        case BUILTIN_VAR_ROOM_SPEED:
+            runner->currentRoom->speed = (uint32_t) RValue_toInt32(val);
+            return;
 
-    // Read-only variables (silently ignore)
-    if ((builtinVarId >= BUILTIN_VAR_OS_TYPE && BUILTIN_VAR_OS_LLVM_WINPHONE >= builtinVarId) ||
-        builtinVarId == BUILTIN_VAR_ID || builtinVarId == BUILTIN_VAR_OBJECT_INDEX ||
-        builtinVarId == BUILTIN_VAR_CURRENT_TIME ||
-        builtinVarId == BUILTIN_VAR_VIEW_CURRENT || builtinVarId == BUILTIN_VAR_PATH_INDEX ||
-        builtinVarId == BUILTIN_VAR_DEBUG_MODE || builtinVarId == BUILTIN_VAR_ROOM_FIRST ||
-        (builtinVarId >= BUILTIN_VAR_BUFFER_FIXED && BUILTIN_VAR_BUFFER_SEEK_END >= builtinVarId)) {
-        fprintf(stderr, "VM: Warning - attempted write to read-only built-in '%s'\n", name);
-        return;
-    }
+        // Read-only variables (silently ignore with warning)
+        case BUILTIN_VAR_OS_TYPE ... BUILTIN_VAR_OS_LLVM_WINPHONE:
+        case BUILTIN_VAR_BUFFER_FIXED ... BUILTIN_VAR_BUFFER_SEEK_END:
+        case BUILTIN_VAR_ID:
+        case BUILTIN_VAR_OBJECT_INDEX:
+        case BUILTIN_VAR_CURRENT_TIME:
+        case BUILTIN_VAR_VIEW_CURRENT:
+        case BUILTIN_VAR_PATH_INDEX:
+        case BUILTIN_VAR_DEBUG_MODE:
+        case BUILTIN_VAR_ROOM_FIRST:
+            fprintf(stderr, "VM: Warning - attempted write to read-only built-in '%s'\n", name);
+            return;
 
-    // argument[N] - array-style write to script arguments
-    if (builtinVarId == BUILTIN_VAR_ARGUMENT) {
-        if (ctx->scriptArgs != nullptr && ctx->scriptArgCount > arrayIndex && arrayIndex >= 0) {
-            RValue_free(&ctx->scriptArgs[arrayIndex]);
-            ctx->scriptArgs[arrayIndex] = val;
+        // argument[N] - array-style write to script arguments
+        case BUILTIN_VAR_ARGUMENT:
+            if (ctx->scriptArgs != nullptr && ctx->scriptArgCount > arrayIndex && arrayIndex >= 0) {
+                RValue_free(&ctx->scriptArgs[arrayIndex]);
+                ctx->scriptArgs[arrayIndex] = val;
+            }
+            return;
+
+        // Argument variables (argument0..argument15)
+        case BUILTIN_VAR_ARGUMENT0 ... BUILTIN_VAR_ARGUMENT15: {
+            int argNumber = builtinVarId - BUILTIN_VAR_ARGUMENT0;
+            if (ctx->scriptArgs != nullptr && ctx->scriptArgCount > argNumber) {
+                RValue_free(&ctx->scriptArgs[argNumber]);
+                ctx->scriptArgs[argNumber] = val;
+            }
+            return;
         }
-        return;
-    }
 
-    // Argument variables
-    if (builtinVarId >= BUILTIN_VAR_ARGUMENT0 && BUILTIN_VAR_ARGUMENT15 >= builtinVarId) {
-        int argNumber = builtinVarId - BUILTIN_VAR_ARGUMENT0;
-        if (ctx->scriptArgs != nullptr && ctx->scriptArgCount > argNumber) {
-            RValue_free(&ctx->scriptArgs[argNumber]);
-            ctx->scriptArgs[argNumber] = val;
-        }
-        return;
+        default:
+            break;
     }
 
     fprintf(stderr, "VM: Unhandled built-in variable write '%s' (arrayIndex=%d)\n", name, arrayIndex);

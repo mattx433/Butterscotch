@@ -1315,6 +1315,9 @@ static void gsDrawText(Renderer* renderer, const char* text, float x, float y, f
     uint8_t b = BGR_B(color) >> 1;
     u64 textColor = GS_SETREG_RGBAQ(r, g, b, a, 0x00);
 
+    float combinedScaleX = xscale * font->scaleX;
+    float combinedScaleY = yscale * font->scaleY;
+
     int32_t textLen = (int32_t) strlen(text);
 
     // Vertical alignment
@@ -1367,10 +1370,10 @@ static void gsDrawText(Renderer* renderer, const char* text, float x, float y, f
                     continue;
                 }
 
-                float glyphX = x + localX0 * xscale * font->scaleX;
-                float glyphY = y + localY0 * yscale * font->scaleY;
-                float glyphW = (float) glyph->sourceWidth * xscale * font->scaleX;
-                float glyphH = (float) glyph->sourceHeight * yscale * font->scaleY;
+                float glyphX = x + localX0 * combinedScaleX;
+                float glyphY = y + localY0 * combinedScaleY;
+                float glyphW = (float) glyph->sourceWidth * combinedScaleX;
+                float glyphH = (float) glyph->sourceHeight * combinedScaleY;
 
                 float sx1 = (glyphX - (float) gs->viewX) * gs->scaleX + gs->offsetX;
                 float sy1 = (glyphY - (float) gs->viewY) * gs->scaleY + gs->offsetY;
@@ -1416,6 +1419,9 @@ static void gsDrawTextColor(Renderer* renderer, const char* text, float x, float
 
     int32_t textLen = (int32_t) strlen(text);
     if(textLen == 0) return;
+
+    float combinedScaleX = xscale * font->scaleX;
+    float combinedScaleY = yscale * font->scaleY;
 
     // Vertical alignment
     int32_t lineCount = TextUtils_countLines(text, textLen);
@@ -1520,10 +1526,10 @@ static void gsDrawTextColor(Renderer* renderer, const char* text, float x, float
                     continue;
                 }
 
-                float glyphX = x + localX0 * xscale * font->scaleX;
-                float glyphY = y + localY0 * yscale * font->scaleY;
-                float glyphW = (float) glyph->sourceWidth * xscale * font->scaleX;
-                float glyphH = (float) glyph->sourceHeight * yscale * font->scaleY;
+                float glyphX = x + localX0 * combinedScaleX;
+                float glyphY = y + localY0 * combinedScaleY;
+                float glyphW = (float) glyph->sourceWidth * combinedScaleX;
+                float glyphH = (float) glyph->sourceHeight * combinedScaleY;
 
                 float sx1 = (glyphX - (float) gs->viewX) * gs->scaleX + gs->offsetX;
                 float sy1 = (glyphY - (float) gs->viewY) * gs->scaleY + gs->offsetY;

@@ -19,7 +19,7 @@ SpatialGrid* SpatialGrid_create(uint32_t roomWidth, uint32_t roomHeight) {
     grid->gridWidth = gridWidth;
     grid->gridHeight = gridHeight;
 
-    grid->grid = safeCalloc(gridWidth * gridHeight, sizeof(int32_t*));
+    grid->grid = safeCalloc(gridWidth * gridHeight, sizeof(Instance**));
 
     return grid;
 }
@@ -40,8 +40,8 @@ static void removeInstanceFromGridCells(SpatialGrid* grid, Instance* instance) {
         int32_t gridY = SpatialGrid_unpackGridY(gridCoordinates);
         int32_t cellIndex = SpatialGrid_cellIndex(grid, gridX, gridY);
         repeat(arrlen(grid->grid[cellIndex]), j) {
-            if (grid->grid[cellIndex][j] == instance->instanceId) {
-                arrdel(grid->grid[ci], j);
+            if (grid->grid[cellIndex][j] == instance) {
+                arrdel(grid->grid[cellIndex], j);
                 break;
             }
         }
@@ -79,7 +79,7 @@ void SpatialGrid_syncGrid(Runner* runner, SpatialGrid* grid) {
 
         for (int32_t gx = range.minGridX; range.maxGridX >= gx; gx++) {
             for (int32_t gy = range.minGridY; range.maxGridY >= gy; gy++) {
-                arrput(grid->grid[SpatialGrid_cellIndex(grid, gx, gy)], instance->instanceId);
+                arrput(grid->grid[SpatialGrid_cellIndex(grid, gx, gy)], instance);
                 arrput(instance->collisionCells, SpatialGrid_packGridCoordinates(gx, gy));
             }
         }
@@ -102,5 +102,7 @@ void SpatialGrid_markInstanceAsDirty(SpatialGrid* grid, Instance* dirtyInstance)
 
     dirtyInstance->spatialGridDirty = true;
 
+    // You may be thinking "why don't we store the Instance pointer?"
+    // Well, it is because the Instance* may not be valid when SpatialGrid_syncGrid is ran
     arrput(grid->dirtyInstances, dirtyInstance->instanceId);
 }

@@ -16,8 +16,8 @@ typedef struct {
     int16_t gridWidth;
     int16_t gridHeight;
     int32_t* dirtyInstances;
-    // Flat 2D grid of instance ID stb_ds arrays
-    int32_t** grid;
+    // Flat 2D grid of Instance* stb_ds arrays
+    Instance*** grid;
 } SpatialGrid;
 
 static inline int32_t SpatialGrid_cellIndex(SpatialGrid* grid, int32_t x, int32_t y) {

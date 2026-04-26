@@ -794,12 +794,7 @@ void VMBuiltins_setVariable(VMContext* ctx, int16_t builtinVarId, const char* na
             return;
         case BUILTIN_VAR_IMAGE_INDEX: {
             if (inst == nullptr) break;
-            float value = (float) RValue_toReal(val);
-            bool changed = value != inst->imageIndex;
-            if (changed) {
-                inst->imageIndex = value;
-                SpatialGrid_markInstanceAsDirty(runner->spatialGrid, inst);
-            }
+            inst->imageIndex = (float) RValue_toReal(val);
             return;
         }
         case BUILTIN_VAR_IMAGE_XSCALE: {

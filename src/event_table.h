@@ -67,6 +67,14 @@ void EventSlotMap_destroy(EventSlotMap* m);
 void ResolvedEventTable_build(ResolvedEventTable* outTable, DataWin* dw, const EventSlotMap* slotMap);
 void ResolvedEventTable_free(ResolvedEventTable* t);
 
+// Returns the responder entries for a slot. *outCount is set to the number of entries (0 if no object listens for this slot).
+static inline SlotResponderEntry* ResolvedEventTable_slotEntries(const ResolvedEventTable* t, int32_t slot, uint32_t* outCount) {
+    uint32_t lo = t->bySlotStart[slot];
+    uint32_t hi = t->bySlotStart[slot + 1];
+    *outCount = hi - lo;
+    return t->bySlot + lo;
+}
+
 // O(1) slot lookup. Returns -1 if (eventType, eventSubtype) has no listeners in this DataWin. Inlined into hot dispatch paths.
 static inline int32_t EventSlotMap_lookup(const EventSlotMap* m, int32_t eventType, int32_t eventSubtype) {
     if ((uint32_t) eventType >= OBJT_EVENT_TYPE_COUNT) return -1;

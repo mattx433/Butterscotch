@@ -353,12 +353,12 @@ void Runner_executeEventForAll(Runner* runner, int32_t eventType, int32_t eventS
     // On GMS 2.x, the native runner dispatches events in the eventUsesPerObjectDispatch set per-object. Route those through executeEventPerObject to match.
     if (DataWin_isVersionAtLeast(runner->dataWin, 2, 0, 0, 0) && eventUsesBC17PerObjectDispatch(eventType)) {
         ResolvedEventTable* table = &runner->eventTable;
-        uint32_t lo = table->bySlotStart[slot];
-        uint32_t hi = table->bySlotStart[slot + 1];
-        if (lo == hi) return;
+        uint32_t entryCount;
+        SlotResponderEntry* entries = ResolvedEventTable_slotEntries(table, slot, &entryCount);
+        if (entryCount == 0) return;
 
-        for (uint32_t i = lo; hi > i; i++) {
-            int32_t concreteObj = table->bySlot[i].concreteObjectId;
+        repeat(entryCount, i) {
+            int32_t concreteObj = entries[i].concreteObjectId;
             Instance** bucket = runner->instancesByExactObject[concreteObj];
             int32_t bucketCount = (int32_t) arrlen(bucket);
             if (bucketCount == 0) continue;
@@ -1329,10 +1329,10 @@ static void populateObjectsWithAnyEventOfType(Runner* runner) {
         for (int32_t sub = 0; maxSub >= sub; sub++) {
             int32_t slot = dense[sub];
             if (0 > slot) continue;
-            uint32_t lo = runner->eventTable.bySlotStart[slot];
-            uint32_t hi = runner->eventTable.bySlotStart[slot + 1];
-            for (uint32_t i = lo; hi > i; i++) {
-                int32_t obj = runner->eventTable.bySlot[i].concreteObjectId;
+            uint32_t entryCount;
+            SlotResponderEntry* entries = ResolvedEventTable_slotEntries(&runner->eventTable, slot, &entryCount);
+            repeat(entryCount, i) {
+                int32_t obj = entries[i].concreteObjectId;
                 if (obj < 0 || obj >= objectCount) continue;
                 if (seen[obj]) continue;
                 seen[obj] = 1;
@@ -1714,15 +1714,15 @@ static void dispatchOutsideRoomEvents(Runner* runner) {
     int32_t outsideSlot = EventSlotMap_lookup(&runner->eventSlotMap, EVENT_OTHER, OTHER_OUTSIDE_ROOM);
     if (0 > outsideSlot) return;
     ResolvedEventTable* table = &runner->eventTable;
-    uint32_t subLo = table->bySlotStart[outsideSlot];
-    uint32_t subHi = table->bySlotStart[outsideSlot + 1];
-    if (subLo == subHi) return;
+    uint32_t entryCount;
+    SlotResponderEntry* entries = ResolvedEventTable_slotEntries(table, outsideSlot, &entryCount);
+    if (entryCount == 0) return;
 
     int32_t roomWidth = (int32_t) runner->currentRoom->width;
     int32_t roomHeight = (int32_t) runner->currentRoom->height;
 
-    for (uint32_t s = subLo; subHi > s; s++) {
-        int32_t objIdx = table->bySlot[s].concreteObjectId;
+    repeat(entryCount, s) {
+        int32_t objIdx = entries[s].concreteObjectId;
         Instance** bucket = runner->instancesByExactObject[objIdx];
         int32_t bucketCount = (int32_t) arrlen(bucket);
         if (bucketCount == 0) continue;
@@ -2033,11 +2033,11 @@ void Runner_step(Runner* runner) {
         int32_t alarmSlot = EventSlotMap_lookup(&runner->eventSlotMap, EVENT_ALARM, alarmIdx);
         if (0 > alarmSlot) continue;
         ResolvedEventTable* table = &runner->eventTable;
-        uint32_t lo = table->bySlotStart[alarmSlot];
-        uint32_t hi = table->bySlotStart[alarmSlot + 1];
+        uint32_t entryCount;
+        SlotResponderEntry* entries = ResolvedEventTable_slotEntries(table, alarmSlot, &entryCount);
 
-        for (uint32_t s = lo; hi > s; s++) {
-            int32_t objIdx = table->bySlot[s].concreteObjectId;
+        repeat(entryCount, s) {
+            int32_t objIdx = entries[s].concreteObjectId;
             Instance** bucket = runner->instancesByExactObject[objIdx];
             int32_t bucketCount = (int32_t) arrlen(bucket);
             if (bucketCount == 0) continue;

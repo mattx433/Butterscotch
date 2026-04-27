@@ -4,6 +4,11 @@
 #include "renderer.h"
 #include <glad/glad.h>
 
+//#include "matrix_math.h"
+
+
+
+
 // ===[ GLRenderer Struct ]===
 // Exposed in the header so platform-specific code (main.c) can access FBO fields for screenshots.
 typedef struct {
@@ -12,6 +17,8 @@ typedef struct {
     GLuint shaderProgram;
     GLint uProjection;
     GLint uTexture;
+
+    //Matrix4f previousViewMatix;
 
     GLuint vao, vbo, ebo;
     float* vertexData; // MAX_QUADS * VERTICES_PER_QUAD * FLOATS_PER_VERTEX floats
@@ -41,6 +48,18 @@ typedef struct {
     uint32_t originalTexturePageCount;
     uint32_t originalTpagCount;
     uint32_t originalSpriteCount;
+    uint32_t surfaceCount;
+
+
+    GLuint* surfaces;
+    GLuint* surfaceTexture;
+    int32_t* surfaceWidth;
+    int32_t* surfaceHeight;
+    uint32_t ssurfaceCount;
+
+
+
+
 } GLRenderer;
 
 Renderer* GLRenderer_create(void);

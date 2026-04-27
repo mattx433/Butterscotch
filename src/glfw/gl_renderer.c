@@ -44,6 +44,23 @@ static const char* fragmentShaderSource =
     "    fragColor = texture(uTexture, vTexCoord) * vColor;\n"
     "}\n";
 
+// ===[ Blend Factors ]===
+static const GLenum BlendModeFactors[11] =
+    {
+        [0] = GL_ZERO, //bm_zero
+        [1] = GL_ONE, //bm_one
+        [2] = GL_SRC_COLOR, //bm_src_colour
+        [3] = GL_ONE_MINUS_SRC_COLOR, //bm_inv_src_colour
+        [4] = GL_SRC_ALPHA, //bm_src_alpha
+        [5] = GL_ONE_MINUS_SRC_ALPHA, //bm_inv_src_alpha
+        [6] = GL_DST_ALPHA, //bm_dest_alpha
+        [7] = GL_ONE_MINUS_SRC_ALPHA, //bm_inv_dest_alpha
+        [8] = GL_DST_COLOR, //bm_dest_colour
+        [9] = GL_ONE_MINUS_DST_COLOR, //bm_inv_dest_colour
+        [10] = GL_SRC_ALPHA_SATURATE, //bm_src_alpha_sat
+    };
+
+
 // ===[ Shader Compilation ]===
 
 static GLuint compileShader(GLenum type, const char* source) {
@@ -302,6 +319,8 @@ static void glBeginView(Renderer* renderer, int32_t viewX, int32_t viewY, int32_
     glActiveTexture(GL_TEXTURE0);
 
     glBindVertexArray(gl->vao);
+    renderer->PreviousViewMatrix = projection;
+
 }
 
 static void glEndView(Renderer* renderer) {
@@ -762,7 +781,7 @@ static void glDrawTriangle(Renderer *renderer, float x1, float y1, float x2, flo
 {
     GLRenderer* gl = (GLRenderer*) renderer;
     if(outline)
-    {
+    { 
         glDrawLine(renderer, x1, y1, x2, y2, 1, renderer->drawColor, 1.0);
         glDrawLine(renderer, x2, y2, x3, y3, 1, renderer->drawColor, 1.0);
         glDrawLine(renderer, x3, y3, x1, y1, 1, renderer->drawColor, 1.0);
@@ -787,6 +806,149 @@ static void glDrawTriangle(Renderer *renderer, float x1, float y1, float x2, flo
         glDrawArrays(GL_TRIANGLES, 0, 3);
     }
 }
+
+static void glDrawTriangleColor(Renderer *renderer, float x1, float y1, float x2, float y2, float x3, float y3, uint32_t color1, uint32_t color2, uint32_t color3, bool outline, float alpha)
+{
+    GLRenderer* gl = (GLRenderer*) renderer;
+    if(outline)
+    { 
+        glDrawLine(renderer, x1, y1, x2, y2, 1, color1, alpha);
+        glDrawLine(renderer, x2, y2, x3, y3, 1, color1, alpha);
+        glDrawLine(renderer, x3, y3, x1, y1, 1, color1, alpha);
+    } else {
+        float r1 = (float) BGR_R(color1) / 255.0f;
+        float g1 = (float) BGR_G(color1) / 255.0f;
+        float b1 = (float) BGR_B(color1) / 255.0f;
+        float r2 = (float) BGR_R(color2) / 255.0f;
+        float g2 = (float) BGR_G(color2) / 255.0f;
+        float b2 = (float) BGR_B(color2) / 255.0f;
+        float r3 = (float) BGR_R(color3) / 255.0f;
+        float g3 = (float) BGR_G(color3) / 255.0f;
+        float b3 = (float) BGR_B(color3) / 255.0f;
+
+
+        flushBatch(gl);
+        
+        int i = 0;
+        float verts[24] = {
+            x1, y1, 0.0f, 0.0f, r1, g1, b1, alpha,
+            x2, y2, 0.0f, 0.0f, r2, g2, b2, alpha,
+            x3, y3, 0.0f, 0.0f, r3, g3, b3, alpha,
+        };
+
+        glBindBuffer(GL_ARRAY_BUFFER, gl->vbo);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, 3 * FLOATS_PER_VERTEX * sizeof(float), verts);
+
+        glBindTexture(GL_TEXTURE_2D, gl->whiteTexture);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+    }
+}
+
+
+
+static void glDrawCircle(Renderer *renderer, float x, float y, float radius, bool outline)
+{
+    GLRenderer* gl = (GLRenderer*) renderer;
+
+    float phase = 0.0;
+    float PI = 3.14159265358979323846;
+    if(outline)
+    {
+
+
+        for (int i = 0; i < renderer->circlePrecision; i++) {
+            //printf("i = %d\n", i);
+            float x1 = x+sin(phase)*radius;
+            float x2 = x+sin(phase+((PI*2.0)/(float) renderer->circlePrecision))*radius;
+            float y1 = y+cos(phase)*radius;
+            float y2 = y+cos(phase+((PI*2.0)/(float) renderer->circlePrecision))*radius;
+            phase += ((PI*2.0)/(float) renderer->circlePrecision);
+            glDrawLine(renderer, x1, y1, x2, y2, 1, renderer->drawColor, 1.0);
+        }
+
+
+
+    } else {
+        float r = (float) BGR_R(renderer->drawColor) / 255.0f;
+        float g = (float) BGR_G(renderer->drawColor) / 255.0f;
+        float b = (float) BGR_B(renderer->drawColor) / 255.0f;
+
+        flushBatch(gl);
+        //float x1 = x;
+        //float y1 = y;
+        //float x2 = x;
+        //float y2 = y;
+
+
+        for (int i = 0; i < renderer->circlePrecision; i++) {
+            //printf("i = %d\n", i);
+            float x1 = x+sin(phase)*radius;
+            float x2 = x+sin(phase+((PI*2.0)/(float) renderer->circlePrecision))*radius;
+            float y1 = y+cos(phase)*radius;
+            float y2 = y+cos(phase+((PI*2.0)/(float) renderer->circlePrecision))*radius;
+            phase += ((PI*2.0)/(float) renderer->circlePrecision);
+            //glDrawLine(renderer, x1, y1, x2, y2, 1, renderer->drawColor, 1.0);
+
+            glDrawTriangle(renderer,x1,y1,x2,y2,x,y,false);
+
+        }
+
+    }
+}
+
+
+
+
+
+static void glDrawCircleColor(Renderer *renderer, float x, float y, float radius, uint32_t color1, uint32_t color2, bool outline) {
+    GLRenderer* gl = (GLRenderer*) renderer;
+
+    float phase = 0.0;
+    float PI = 3.14159265358979323846;
+    if(outline)
+    {
+
+
+        for (int i = 0; i < renderer->circlePrecision; i++) {
+            //printf("i = %d\n", i);
+            float x1 = x+sin(phase)*radius;
+            float x2 = x+sin(phase+((PI*2.0)/(float) renderer->circlePrecision))*radius;
+            float y1 = y+cos(phase)*radius;
+            float y2 = y+cos(phase+((PI*2.0)/(float) renderer->circlePrecision))*radius;
+            phase += ((PI*2.0)/(float) renderer->circlePrecision);
+            glDrawLine(renderer, x1, y1, x2, y2, 1, color2, 1.0);
+        }
+
+
+
+    } else {
+
+        flushBatch(gl);
+        //float x1 = x;
+        //float y1 = y;
+        //float x2 = x;
+        //float y2 = y;
+
+
+        for (int i = 0; i < renderer->circlePrecision; i++) {
+            //printf("i = %d\n", i);
+            float x1 = x+sin(phase)*radius;
+            float x2 = x+sin(phase+((PI*2.0)/(float) renderer->circlePrecision))*radius;
+            float y1 = y+cos(phase)*radius;
+            float y2 = y+cos(phase+((PI*2.0)/(float) renderer->circlePrecision))*radius;
+            phase += ((PI*2.0)/(float) renderer->circlePrecision);
+            //glDrawLine(renderer, x1, y1, x2, y2, 1, renderer->drawColor, 1.0);
+
+            //glDrawTriangle(renderer,x1,y1,x2,y2,x,y,false);
+            glDrawTriangleColor(renderer,x1,y1,x2,y2,x,y,color2, color2, color1, outline, renderer->drawAlpha);
+
+
+        }
+
+    }
+}
+
+
 
 // ===[ Text Drawing ]===
 
@@ -1211,7 +1373,510 @@ static uint32_t findOrAllocTpagSlot(DataWin* dw, uint32_t originalTpagCount) {
     return newIndex;
 }
 
-static int32_t glCreateSpriteFromSurface(Renderer* renderer, int32_t x, int32_t y, int32_t w, int32_t h, bool removeback, bool smooth, int32_t xorig, int32_t yorig) {
+
+
+// Finds a free dynamic Surface slot or appends a new one.
+static uint32_t findOrAllocSurfaceSlot(GLRenderer* gl) {
+    for (uint32_t i = 0; gl->ssurfaceCount > i; i++) {
+        if (gl->surfaces[i] == 0) return i;
+    }
+    uint32_t newSurfaceIndex = gl->ssurfaceCount;
+    gl->ssurfaceCount++;
+    gl->surfaces = safeRealloc(gl->surfaces, gl->ssurfaceCount * sizeof(GLuint));
+    gl->surfaceTexture = safeRealloc(gl->surfaceTexture, gl->ssurfaceCount * sizeof(GLuint));
+    gl->surfaceWidth = safeRealloc(gl->surfaceWidth, gl->ssurfaceCount * sizeof(int32_t));
+    gl->surfaceHeight = safeRealloc(gl->surfaceHeight, gl->ssurfaceCount * sizeof(int32_t));
+    gl->surfaces[newSurfaceIndex] = 0;
+    gl->surfaceTexture[newSurfaceIndex] = 0;
+    gl->surfaceWidth[newSurfaceIndex] = 0;
+    gl->surfaceHeight[newSurfaceIndex] = 0;
+    return newSurfaceIndex;
+}
+
+
+
+
+
+
+static int32_t glCreateSurface(Renderer* renderer, int32_t width, int32_t height) {
+    GLRenderer* gl = (GLRenderer*) renderer;
+    DataWin* dw = renderer->dataWin;
+
+    uint32_t surfaceIndex = findOrAllocSurfaceSlot(gl);
+
+
+    glGenFramebuffers(1, &gl->surfaces[surfaceIndex]);
+    
+    glGenTextures(1, &gl->surfaceTexture[surfaceIndex]);
+    glBindTexture(GL_TEXTURE_2D, gl->surfaceTexture[surfaceIndex]);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, gl->surfaces[surfaceIndex]);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gl->surfaceTexture[surfaceIndex], 0);
+    //glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    //glClear(GL_COLOR_BUFFER_BIT);
+    fprintf(stderr, "GL: Created Surface %u Size (%dx%d)\n", surfaceIndex, width, height);
+
+    
+
+    glBindFramebuffer(GL_FRAMEBUFFER, gl->fbo);
+
+
+    //gl->surfaceTexture[surfaceIndex] = 0;
+    gl->surfaceWidth[surfaceIndex] = width;
+    gl->surfaceHeight[surfaceIndex] = height;
+
+
+
+    //glGenTextures
+    return surfaceIndex;
+}
+
+
+/*
+glSurfaceFree
+    gl->surfaceTexture[newSurfaceIndex] = 0;
+    gl->surfaceWidth[newSurfaceIndex] = 0;
+    gl->surfaceHeight[newSurfaceIndex] = 0;
+*/
+
+
+static void glSurfaceFree(Renderer* renderer, int32_t surfaceID) {
+    GLRenderer* gl = (GLRenderer*) renderer;
+    if (surfaceID = -1) return;
+    if (gl->surfaceTexture[surfaceID] != 0) glDeleteTextures(1, &gl->surfaceTexture[surfaceID]);
+    if (gl->surfaces[surfaceID] != 0) glDeleteFramebuffers(1, &gl->surfaces[surfaceID]);
+
+
+
+
+    glBindFramebuffer(GL_FRAMEBUFFER, gl->fbo);
+    gl->surfaces[surfaceID] = 0;
+    gl->surfaceTexture[surfaceID] = 0;
+    gl->surfaceWidth[surfaceID] = 0;
+    gl->surfaceHeight[surfaceID] = 0;
+    fprintf(stderr, "GL: Freed Surface %u\n", surfaceID);
+}
+
+
+
+
+//glSurfaceResize
+
+static void glSurfaceResize(Renderer* renderer, int32_t surfaceID, int32_t width, int32_t height) {
+    GLRenderer* gl = (GLRenderer*) renderer;
+
+    if (surfaceID != -1) {
+        if (gl->surfaceWidth[surfaceID] == width && gl->surfaceHeight[surfaceID] == height) return;
+
+        if (gl->surfaceTexture[surfaceID] != 0) glDeleteTextures(1, &gl->surfaceTexture[surfaceID]);
+
+        glGenTextures(1, &gl->surfaceTexture[surfaceID]);
+        glBindTexture(GL_TEXTURE_2D, gl->surfaceTexture[surfaceID]);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, gl->surfaces[surfaceID]);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gl->surfaceTexture[surfaceID], 0);
+
+        fprintf(stderr, "GL: Resized Surface %u Size (%dx%d)\n", surfaceID, width, height);
+        glBindFramebuffer(GL_FRAMEBUFFER, gl->fbo);
+        gl->surfaceWidth[surfaceID] = width;
+        gl->surfaceHeight[surfaceID] = height;
+    }
+
+/*
+    glBindFramebuffer(GL_FRAMEBUFFER, gl->fbo);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gl->fboTexture, 0);
+*/
+
+}
+
+
+static bool glSurfaceExists(Renderer* renderer, int32_t surfaceId) {
+    GLRenderer* gl = (GLRenderer*) renderer;
+
+
+    if (surfaceId > -1) {
+        if (surfaceId < gl->ssurfaceCount)
+        {
+            if (gl->surfaces[surfaceId] != 0) {
+
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+
+
+
+static bool glSetSurfaceTarget(Renderer* renderer, int32_t surfaceId) {
+    GLRenderer* gl = (GLRenderer*) renderer;
+
+    flushBatch(gl);
+
+    //fprintf(stderr, "Set Surface Target %u\n", surfaceId);
+    if (surfaceId > -1) {
+        if (surfaceId < gl->ssurfaceCount)
+        {
+            if (gl->surfaces[surfaceId] != 0) {
+
+
+                    glBindFramebuffer(GL_FRAMEBUFFER, gl->surfaces[surfaceId]);
+
+                    // Build orthographic projection (Y-down for GML coordinate system)
+                    Matrix4f projection;
+                    Matrix4f_identity(&projection);
+                    Matrix4f_ortho(&projection, (float) 0.0, (float) gl->surfaceWidth[surfaceId], gl->surfaceHeight[surfaceId], (float) 0.0, -1.0f, 1.0f);
+
+                    glUseProgram(gl->shaderProgram);
+                    glUniformMatrix4fv(gl->uProjection, 1, GL_FALSE, projection.m);
+                    glUniform1i(gl->uTexture, 0);
+                    glViewport(0,0,gl->surfaceWidth[surfaceId],gl->surfaceHeight[surfaceId]);
+
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+
+
+
+
+static bool glResetSurfaceTarget(Renderer* renderer) {
+    GLRenderer* gl = (GLRenderer*) renderer;
+
+    flushBatch(gl);
+
+
+    glUniformMatrix4fv(gl->uProjection, 1, GL_FALSE, renderer->PreviousViewMatrix.m);
+    glBindFramebuffer(GL_FRAMEBUFFER, gl->fbo);
+    glViewport(0, 0, gl->fboWidth, gl->fboHeight);
+
+    return true;
+}
+
+
+
+
+
+
+static float glGetSurfaceWidth(Renderer* renderer, int32_t surfaceId) {
+    GLRenderer* gl = (GLRenderer*) renderer;
+
+    flushBatch(gl);
+
+    //fprintf(stderr, "Get Surface Width %u\n", surfaceId);
+    if (surfaceId > -1) {
+        if (surfaceId < gl->ssurfaceCount)
+        {
+            if (gl->surfaces[surfaceId] != 0) {
+
+                return (float) gl->surfaceWidth[surfaceId];
+            }
+        }
+    }
+
+    return 0.0;
+}
+
+
+
+static float glGetSurfaceHeight(Renderer* renderer, int32_t surfaceId) {
+    GLRenderer* gl = (GLRenderer*) renderer;
+
+    flushBatch(gl);
+
+    //fprintf(stderr, "Get Surface Height %u\n", surfaceId);
+    if (surfaceId > -1) {
+        if (surfaceId < gl->ssurfaceCount)
+        {
+            if (gl->surfaces[surfaceId] != 0) {
+
+                return (float) gl->surfaceHeight[surfaceId];
+            }
+        }
+    }
+
+    return 0.0;
+}
+
+static void glDrawSurface(Renderer* renderer, int32_t surfaceID, float x, float y, float xscale, float yscale, float angleDeg, uint32_t color, float alpha) {
+
+    GLRenderer* gl = (GLRenderer*) renderer;
+
+    int32_t texW = 0;
+    int32_t texH = 0;
+
+
+
+    if (surfaceID != -1) {
+    
+        if (0 > surfaceID || gl->ssurfaceCount <= (uint32_t) surfaceID) return;
+        gl->currentTextureId = gl->surfaceTexture[surfaceID];  
+    
+        texW = gl->surfaceWidth[surfaceID];
+        texH = gl->surfaceHeight[surfaceID];    
+    } else {
+            gl->currentTextureId = gl->fboTexture;
+            texW = gl->fboWidth;
+            texH = gl->fboHeight;
+        }
+    //GLuint texId = gl->surfaceTexture[surfaceID];
+
+
+    // Flush if texture changed or batch full
+
+    flushBatch(gl);
+
+    if (gl->quadCount >= MAX_QUADS) {
+        flushBatch(gl);
+    }
+
+    //what a mess I think!
+
+    //glSetSurfaceTarget(renderer, surfaceID);
+    //float u0 = (float) 0.0;
+    //float v0 = (float) 0.0;
+    //float u1 = (float) texW / (float) GL_RENDERBUFFER_WIDTH;
+    //float v1 = (float) texH / (float) GL_RENDERBUFFER_HEIGHT;
+    //glResetSurfaceTarget(renderer);
+
+    float u0 = (float) 0.0;
+    float v0 = (float) 1.0;
+    float u1 = (float) 1.0;
+    float v1 = (float) 0.0;
+
+
+    // Compute local quad corners (relative to origin, with target offset)
+    float localX0 = (float) 0.0;
+    float localY0 = (float) 0.0;
+    float localX1 = (float) texW;
+    float localY1 = (float) texH;
+
+    // Build 2D transform: T(x,y) * R(-angleDeg) * S(xscale, yscale)
+    // GML rotation is counter-clockwise, OpenGL rotation is counter-clockwise, but
+    // since we have Y-down, we negate the angle to get the correct visual rotation
+    float angleRad = -angleDeg * ((float) M_PI / 180.0f);
+    Matrix4f transform;
+    Matrix4f_setTransform2D(&transform, x, y, xscale, yscale, angleRad);
+
+    // Transform 4 corners
+    float x0, y0, x1, y1, x2, y2, x3, y3;
+    Matrix4f_transformPoint(&transform, localX0, localY0, &x0, &y0); // top-left
+    Matrix4f_transformPoint(&transform, localX1, localY0, &x1, &y1); // top-right
+    Matrix4f_transformPoint(&transform, localX1, localY1, &x2, &y2); // bottom-right
+    Matrix4f_transformPoint(&transform, localX0, localY1, &x3, &y3); // bottom-left
+
+    // Convert BGR color to RGB floats
+    float r = (float) BGR_R(color) / 255.0f;
+    float g = (float) BGR_G(color) / 255.0f;
+    float b = (float) BGR_B(color) / 255.0f;
+
+    // Write 4 vertices into batch buffer
+    float* verts = gl->vertexData + gl->quadCount * VERTICES_PER_QUAD * FLOATS_PER_VERTEX;
+
+    // Vertex 0: top-left
+    verts[0] = x0; verts[1] = y0; verts[2] = u0; verts[3] = v0;
+    verts[4] = r;  verts[5] = g;  verts[6] = b;  verts[7] = alpha;
+
+    // Vertex 1: top-right
+    verts[8]  = x1; verts[9]  = y1; verts[10] = u1; verts[11] = v0;
+    verts[12] = r;  verts[13] = g;  verts[14] = b;  verts[15] = alpha;
+
+    // Vertex 2: bottom-right
+    verts[16] = x2; verts[17] = y2; verts[18] = u1; verts[19] = v1;
+    verts[20] = r;  verts[21] = g;  verts[22] = b;  verts[23] = alpha;
+
+    // Vertex 3: bottom-left
+    verts[24] = x3; verts[25] = y3; verts[26] = u0; verts[27] = v1;
+    verts[28] = r;  verts[29] = g;  verts[30] = b;  verts[31] = alpha;
+
+    gl->quadCount++;
+}
+
+
+
+
+static void glDrawSurfacePart(Renderer* renderer, int32_t surfaceID, int32_t x, int32_t y, int32_t left, int32_t top, int32_t width, int32_t height) {
+
+    GLRenderer* gl = (GLRenderer*) renderer;
+
+    if (0 > surfaceID || gl->ssurfaceCount <= (uint32_t) surfaceID) return;
+
+    //GLuint texId = gl->surfaceTexture[surfaceID];
+    int32_t texW = 0;
+    int32_t texH = 0;
+
+
+
+    if (surfaceID != -1) {
+    
+        if (0 > surfaceID || gl->ssurfaceCount <= (uint32_t) surfaceID) return;
+        gl->currentTextureId = gl->surfaceTexture[surfaceID];  
+    
+        texW = gl->surfaceWidth[surfaceID];
+        texH = gl->surfaceHeight[surfaceID];    
+    } else {
+            gl->currentTextureId = gl->fboTexture;
+            texW = gl->fboWidth;
+            texH = gl->fboHeight;
+        }
+
+    // Flush if texture changed or batch full
+
+    flushBatch(gl);
+
+    if (gl->quadCount >= MAX_QUADS) {
+        flushBatch(gl);
+    }
+
+    //what a mess I think!
+    //gl->currentTextureId = gl->surfaceTexture[surfaceID];
+    //glSetSurfaceTarget(renderer, surfaceID);
+    //float u0 = (float) 0.0;
+    //float v0 = (float) 0.0;
+    //float u1 = (float) texW / (float) GL_RENDERBUFFER_WIDTH;
+    //float v1 = (float) texH / (float) GL_RENDERBUFFER_HEIGHT;
+    //glResetSurfaceTarget(renderer);
+
+    float u0 = (float) left / (float) texW;
+    float v0 = (float) (float) texH - (top / (float) texH);
+    float u1 = (float) (left + width) / (float) texW;
+    float v1 = (float) (float) texH - ((top + height) / (float) texH);
+
+    // Compute local quad corners (relative to origin, with target offset)
+    float x0 = (float) x;
+    float y0 = (float) y;
+    float x1 = x0 + (float) width;
+    float y1 = y0 + (float) height;
+    float alpha = 1.0;
+    // Build 2D transform: T(x,y) * R(-angleDeg) * S(xscale, yscale)
+    // GML rotation is counter-clockwise, OpenGL rotation is counter-clockwise, but
+    // since we have Y-down, we negate the angle to get the correct visual rotation
+    // Convert BGR color to RGB floats
+    float r = 1.0f;
+    float g = 1.0f;
+    float b = 1.0f;
+
+    // Write 4 vertices into batch buffer
+    float* verts = gl->vertexData + gl->quadCount * VERTICES_PER_QUAD * FLOATS_PER_VERTEX;
+
+    // Vertex 0: top-left
+    verts[0] = x0; verts[1] = y0; verts[2] = u0; verts[3] = v0;
+    verts[4] = r;  verts[5] = g;  verts[6] = b;  verts[7] = alpha;
+
+    // Vertex 1: top-right
+    verts[8]  = x1; verts[9]  = y0; verts[10] = u1; verts[11] = v0;
+    verts[12] = r;  verts[13] = g;  verts[14] = b;  verts[15] = alpha;
+
+    // Vertex 2: bottom-right
+    verts[16] = x1; verts[17] = y1; verts[18] = u1; verts[19] = v1;
+    verts[20] = r;  verts[21] = g;  verts[22] = b;  verts[23] = alpha;
+
+    // Vertex 3: bottom-left
+    verts[24] = x0; verts[25] = y1; verts[26] = u0; verts[27] = v1;
+    verts[28] = r;  verts[29] = g;  verts[30] = b;  verts[31] = alpha;
+
+    gl->quadCount++;
+
+}
+
+
+
+
+
+static void glDrawClear(Renderer* renderer, uint32_t color, float alpha) {
+
+
+    // Convert BGR color to RGB floats
+    float r = (float) BGR_R(color) / 255.0f;
+    float g = (float) BGR_G(color) / 255.0f;
+    float b = (float) BGR_B(color) / 255.0f;
+
+
+  
+    glClearColor(r, g, b, alpha);
+    glClear(GL_COLOR_BUFFER_BIT);    
+
+}
+
+
+static void glSetBlendModeBasic(Renderer* renderer, int32_t BlendMode) {
+    
+    GLRenderer* gl = (GLRenderer*) renderer;
+    flushBatch(gl);
+    glEnable(GL_BLEND);
+
+    switch (BlendMode) {
+        case 0:
+            glBlendFunc(BlendModeFactors[4], BlendModeFactors[5]);
+            //glBlendEquation(GL_FUNC_ADD);
+            //fprintf(stderr, "GPU Set Blendmode bm_normal\n");
+            break;
+        case 1:
+            glBlendFunc(BlendModeFactors[4], BlendModeFactors[1]);
+            //glBlendEquation(GL_FUNC_ADD);
+            //fprintf(stderr, "GPU Set Blendmode bm_add\n");
+            break;
+        case 2:
+            glBlendFunc(BlendModeFactors[0], BlendModeFactors[3]);
+            //glBlendEquation(GL_FUNC_SUBTRACT);
+            //fprintf(stderr, "GPU Set Blendmode bm_subtract\n");
+            break;
+        case 3:
+            glBlendFunc(BlendModeFactors[4], BlendModeFactors[3]);
+            //glBlendEquation(GL_MAX);
+            //fprintf(stderr, "GPU Set Blendmode bm_max\n");
+            break;
+    }    
+}
+
+
+
+
+static void glSetBlendModeExt(Renderer* renderer, int32_t src, int32_t dest) {
+    
+    GLRenderer* gl = (GLRenderer*) renderer;
+    flushBatch(gl);
+    glEnable(GL_BLEND);
+    glBlendFunc(BlendModeFactors[src],BlendModeFactors[dest]);
+}
+
+static void glSetColorWriteEnable(Renderer* renderer, bool r, bool g, bool b, bool a) {
+    
+    GLRenderer* gl = (GLRenderer*) renderer;
+    flushBatch(gl);
+    glColorMask(r, g, b, a);
+    //glEnable(GL_BLEND);
+    //glBlendFunc(BlendModeFactors[src],BlendModeFactors[dest]);
+}
+
+
+static void glSetBlendEnable(Renderer* renderer, bool enabled) {
+    
+    GLRenderer* gl = (GLRenderer*) renderer;
+    flushBatch(gl);
+    //glColorMask(r, g, b, a);
+    if (enabled == true) {
+        glEnable(GL_BLEND);
+    } else {
+        glDisable(GL_BLEND);
+    }
+    //glEnable(GL_BLEND);
+    //glBlendFunc(BlendModeFactors[src],BlendModeFactors[dest]);
+}
+
+static int32_t glCreateSpriteFromSurface(Renderer* renderer, int32_t surfaceID, int32_t x, int32_t y, int32_t w, int32_t h, bool removeback, bool smooth, int32_t xorig, int32_t yorig) {
     GLRenderer* gl = (GLRenderer*) renderer;
     DataWin* dw = renderer->dataWin;
 
@@ -1220,14 +1885,29 @@ static int32_t glCreateSpriteFromSurface(Renderer* renderer, int32_t x, int32_t 
     // Flush any pending draws before reading pixels
     flushBatch(gl);
 
+    // OpenGL Y is bottom-up, GML Y is top-down, so flip the Y coordinate
+    int32_t glY = gl->fboHeight - y - h;
+
     // Read pixels from the FBO (application_surface)
+    if (surfaceID == -1) {
     glBindFramebuffer(GL_READ_FRAMEBUFFER, gl->fbo);
+    } else {
+        if (surfaceID < gl->ssurfaceCount)
+        {
+            if (gl->surfaces[surfaceID] != 0) {
+
+                    //fprintf(stderr, "WE Got To Renderer2\n");
+                    //fprintf(stderr, "3Set Surface Target\n");
+                    glBindFramebuffer(GL_FRAMEBUFFER, gl->surfaces[surfaceID]);
+                    glY = gl->surfaceHeight[surfaceID] - y - h; 
+            }
+        }
+    }
 
     uint8_t* pixels = safeMalloc((size_t) w * (size_t) h * 4);
     if (pixels == nullptr) return -1;
 
-    // OpenGL Y is bottom-up, GML Y is top-down, so flip the Y coordinate
-    int32_t glY = gl->fboHeight - y - h;
+
     glReadPixels(x, glY, w, h, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
 
     // Flip vertically (OpenGL reads bottom-to-top)
@@ -1288,7 +1968,7 @@ static int32_t glCreateSpriteFromSurface(Renderer* renderer, int32_t x, int32_t 
     sprite->maskCount = 0;
     sprite->masks = nullptr;
 
-    fprintf(stderr, "GL: Created dynamic sprite %u (%dx%d) from surface at (%d,%d)\n", spriteIndex, w, h, x, y);
+    fprintf(stderr, "GL: Created dynamic sprite %u (%dx%d) from surface %d at (%d,%d)\n", spriteIndex, w, h, surfaceID, x, y);
     return (int32_t) spriteIndex;
 }
 
@@ -1350,12 +2030,29 @@ static RendererVtable glVtable = {
     .drawLine = glDrawLine,
     .drawLineColor = glDrawLineColor,
     .drawTriangle = glDrawTriangle,
+    .drawCircle = glDrawCircle,
+    .drawCircleColor = glDrawCircleColor,
     .drawText = glDrawText,
     .drawTextColor = glDrawTextColor,
     .flush = glRendererFlush,
     .createSpriteFromSurface = glCreateSpriteFromSurface,
     .deleteSprite = glDeleteSprite,
     .drawTile = nullptr,
+    .createSurface = glCreateSurface,
+    .surfaceExists = glSurfaceExists,
+    .setSurfaceTarget = glSetSurfaceTarget,
+    .resetSurfaceTarget = glResetSurfaceTarget,
+    .getSurfaceWidth = glGetSurfaceWidth,
+    .getSurfaceHeight = glGetSurfaceHeight,
+    .drawSurface = glDrawSurface,
+    .drawSurfacePart = glDrawSurfacePart,
+    .drawClear = glDrawClear,
+    .surfaceResize = glSurfaceResize,
+    .surfaceFree = glSurfaceFree,
+    .gpuSetBlendmode = glSetBlendModeBasic,
+    .gpuSetBlendmodeExt = glSetBlendModeExt,
+    .gpuSetColorWriteEnable = glSetColorWriteEnable,
+    .gpuSetBlendenable = glSetBlendEnable,
 };
 
 // ===[ Public API ]===
@@ -1365,6 +2062,7 @@ Renderer* GLRenderer_create(void) {
     gl->base.vtable = &glVtable;
     gl->base.drawColor = 0xFFFFFF; // white (BGR)
     gl->base.drawAlpha = 1.0f;
+    gl->base.circlePrecision = 24;
     gl->base.drawFont = -1;
     gl->base.drawHalign = 0;
     gl->base.drawValign = 0;

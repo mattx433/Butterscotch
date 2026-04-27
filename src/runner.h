@@ -3,6 +3,7 @@
 #include "common.h"
 #include "audio_system.h"
 #include "data_win.h"
+#include "event_table.h"
 #include "file_system.h"
 #include "ini.h"
 #include "instance.h"
@@ -289,6 +290,17 @@ typedef struct Runner {
     // This lets collision dispatch iterate only the instances of a target object (and its descendants) instead of scanning all instances in the room.
     // Must be kept in sync with any instance creation, change, or deletion.
     Instance*** instancesByObject;
+    // Same as instancesByObject but each instance only appears in the bucket of its EXACT objectIndex (no ancestors). Used by event dispatch so we don't double-fire when both a child and its parent declare the same event.
+    Instance*** instancesByExactObject;
+    // Precomputed (eventType, eventSubtype) -> dense slot remap. Built once at Runner_create, never mutated.
+    EventSlotMap eventSlotMap;
+    // Precomputed per-object and per-slot CSR tables of resolved event handlers. Replaces the per-dispatch parent-chain walk in findEventCodeIdAndOwner.
+    ResolvedEventTable eventTable;
+    // For each event type, the deduplicated list of object indices that respond to ANY subtype of that event (including via inheritance). Derived from the event table; used by collision dispatch to skip non-collision objects in the outer loop.
+    // Length = OBJT_EVENT_TYPE_COUNT.
+    int32_t** objectsWithAnyEventOfType;
+    // Reusable scratch array for Runner_executeEventForAll. Pre-grown to avoid stb_ds arrput overhead and repeated allocations on the per-frame dispatch path. Owned via stb_ds; truncated at the start of each call.
+    Instance** eventDispatchInstances;
     // LIFO arena used to snapshot per-object instance lists before iteration.
     // Any loop that might fire user code iterates a copy so that in-flight mutations (instance_change swap-remove, spawns, destroys) don't corrupt it.
     // Each call pushes its snapshot (append) and pops on normal loop exit; nesting is safe because pushes/pops are LIFO and outer ranges stay untouched under newer pushes.

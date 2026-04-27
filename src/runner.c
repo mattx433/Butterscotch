@@ -47,39 +47,16 @@ static void freeRuntimeLayersArray(RuntimeLayer** runtimeLayerArray) {
 }
 
 // ===[ Helper: Find event action in object hierarchy ]===
-// Walks the parent chain starting from objectIndex to find an event handler.
-// Returns the EventAction's codeId, or -1 if not found.
-// If outOwnerObjectIndex is non-null, it is set to the objectIndex that owns the found event (or -1 if not found).
-static int32_t findEventCodeIdAndOwner(DataWin* dataWin, int32_t objectIndex, int32_t eventType, int32_t eventSubtype, int32_t* outOwnerObjectIndex) {
-    int32_t currentObj = objectIndex;
-    int depth = 0;
-
-    while (currentObj >= 0 && (uint32_t) currentObj < dataWin->objt.count && 32 > depth) {
-        GameObject* obj = &dataWin->objt.objects[currentObj];
-
-        if (OBJT_EVENT_TYPE_COUNT > eventType) {
-            ObjectEventList* eventList = &obj->eventLists[eventType];
-            repeat(eventList->eventCount, i) {
-                ObjectEvent* evt = &eventList->events[i];
-                if ((int32_t) evt->eventSubtype == eventSubtype) {
-                    // Found it - return the first action's codeId
-                    if (evt->actionCount > 0 && evt->actions[0].codeId >= 0) {
-                        if (outOwnerObjectIndex != nullptr) *outOwnerObjectIndex = currentObj;
-                        return evt->actions[0].codeId;
-                    }
-                    if (outOwnerObjectIndex != nullptr) *outOwnerObjectIndex = -1;
-                    return -1;
-                }
-            }
-        }
-
-        // Walk to parent
-        currentObj = obj->parentId;
-        depth++;
+// Resolves the handler for (objectIndex, eventType, eventSubtype) via the precomputed ResolvedEventTable.
+// Returns the CODE chunk handler id, or -1 if the object does not respond.
+// If outOwnerObjectIndex is non-null, it is set to the resolved owner objectIndex (-1 if not found).
+static int32_t findEventCodeIdAndOwner(Runner* runner, int32_t objectIndex, int32_t eventType, int32_t eventSubtype, int32_t* outOwnerObjectIndex) {
+    int32_t slot = EventSlotMap_lookup(&runner->eventSlotMap, eventType, eventSubtype);
+    if (0 > slot) {
+        if (outOwnerObjectIndex != nullptr) *outOwnerObjectIndex = -1;
+        return -1;
     }
-
-    if (outOwnerObjectIndex != nullptr) *outOwnerObjectIndex = -1;
-    return -1;
+    return ResolvedEventTable_lookup(&runner->eventTable, objectIndex, slot, outOwnerObjectIndex);
 }
 
 // ===[ Per-Object Instance Lists ]===
@@ -96,7 +73,24 @@ void Runner_addInstanceToObjectLists(Runner* runner, Instance* inst) {
         currentObj = dataWin->objt.objects[currentObj].parentId;
         depth++;
     }
+    if (inst->objectIndex >= 0 && dataWin->objt.count > (uint32_t) inst->objectIndex) {
+        arrput(runner->instancesByExactObject[inst->objectIndex], inst);
+    }
     SpatialGrid_markInstanceAsDirty(runner->spatialGrid, inst);
+}
+
+// Stable remove of inst from list, preserving creation order. Returns true if removed.
+static bool removeInstanceFromList(Instance*** listPtr, Instance* inst) {
+    Instance** list = *listPtr;
+    int32_t n = (int32_t) arrlen(list);
+    repeat(n, i) {
+        if (list[i] == inst) {
+            if (n - 1 > i) memmove(&list[i], &list[i + 1], (size_t) (n - 1 - i) * sizeof(Instance*));
+            arrsetlen(*listPtr, n - 1);
+            return true;
+        }
+    }
+    return false;
 }
 
 void Runner_removeInstanceFromObjectLists(Runner* runner, Instance* inst) {
@@ -104,18 +98,12 @@ void Runner_removeInstanceFromObjectLists(Runner* runner, Instance* inst) {
     int32_t currentObj = inst->objectIndex;
     int32_t depth = 0;
     while (currentObj >= 0 && dataWin->objt.count > (uint32_t) currentObj && 32 > depth) {
-        Instance** list = runner->instancesByObject[currentObj];
-        int32_t n = (int32_t) arrlen(list);
-        repeat(n, i) {
-            if (list[i] == inst) {
-                // Stable remove: shift the tail down by one so surviving instances keep their creation order. GML semantics (with, instance_find, obj.var reads) depend on this order.
-                if (n - 1 > i) memmove(&list[i], &list[i + 1], (size_t) (n - 1 - i) * sizeof(Instance*));
-                arrsetlen(runner->instancesByObject[currentObj], n - 1);
-                break;
-            }
-        }
+        removeInstanceFromList(&runner->instancesByObject[currentObj], inst);
         currentObj = dataWin->objt.objects[currentObj].parentId;
         depth++;
+    }
+    if (inst->objectIndex >= 0 && dataWin->objt.count > (uint32_t) inst->objectIndex) {
+        removeInstanceFromList(&runner->instancesByExactObject[inst->objectIndex], inst);
     }
     SpatialGrid_markInstanceAsDirty(runner->spatialGrid, inst);
 }
@@ -125,6 +113,9 @@ void Runner_clearAllObjectLists(Runner* runner) {
     uint32_t count = runner->dataWin->objt.count;
     repeat(count, i) {
         arrsetlen(runner->instancesByObject[i], 0);
+        if (runner->instancesByExactObject != nullptr) {
+            arrsetlen(runner->instancesByExactObject[i], 0);
+        }
     }
 }
 
@@ -298,8 +289,11 @@ const char* Runner_getEventName(int32_t eventType, int32_t eventSubtype) {
 
 void Runner_executeEventFromObject(Runner* runner, Instance* instance, int32_t startObjectIndex, int32_t eventType, int32_t eventSubtype) {
     int32_t ownerObjectIndex = -1;
-    int32_t codeId = findEventCodeIdAndOwner(runner->dataWin, startObjectIndex, eventType, eventSubtype, &ownerObjectIndex);
-
+    int32_t codeId = findEventCodeIdAndOwner(runner, startObjectIndex, eventType, eventSubtype, &ownerObjectIndex);
+    // Fast path: If the codeId is invalid, let's bail out fast
+    // This is the same check that is in the executeCode, but we avoid the need of loading and saving the variables
+    if (0 > codeId)
+        return;
     VMContext* vm = runner->vmContext;
     int32_t savedEventType = vm->currentEventType;
     int32_t savedEventSubtype = vm->currentEventSubtype;
@@ -337,71 +331,60 @@ void Runner_executeEvent(Runner* runner, Instance* instance, int32_t eventType, 
     Runner_executeEventFromObject(runner, instance, instance->objectIndex, eventType, eventSubtype);
 }
 
-// Events that GMS 2.3+ routes through per-object Handle* dispatchers rather than Perform_Event_All.
+// Events that GMS 2.3+ routes through the per-object obj_has_event table instead of Perform_Event_All.
+// Anything else (BC16 ALWAYS; BC17 non-perObject) goes through Runner_executeEventForAll
 static bool eventUsesBC17PerObjectDispatch(int32_t eventType) {
     return eventType == EVENT_STEP || eventType == EVENT_ALARM || eventType == EVENT_KEYBOARD || eventType == EVENT_KEYPRESS || eventType == EVENT_KEYRELEASE;
 }
 
-// Per-object event dispatch matching the native GMS 2.x eventUsesPerObjectDispatch family.
-// Groups instances by objectIndex, then iterates each bucket in insertion order. Object buckets are visited in ascending objectIndex order, mirroring how the native runner's obj_has_event table enumerates objects that declare this event.
-static void executeEventPerObject(Runner* runner, int32_t eventType, int32_t eventSubtype) {
-    // Bucket instances by objectIndex. Each bucket preserves insertion order, so within a single object type instances still fire oldest-first.
-    // The bucket snapshot taken here also doubles as a way to NOT fire events for newly created instances.
-    int32_t objectCount = (int32_t) runner->dataWin->objt.count;
-    Instance*** bucketsByObject = calloc((size_t) objectCount, sizeof(Instance**));
-    int32_t totalInstances = (int32_t) arrlen(runner->instances);
-    repeat(totalInstances, i) {
-        Instance* inst = runner->instances[i];
-        if (inst->objectIndex >= 0 && inst->objectIndex < objectCount) {
-            arrput(bucketsByObject[inst->objectIndex], inst);
-        }
-    }
+void Runner_executeEventForAll(Runner* runner, int32_t eventType, int32_t eventSubtype) {
+    int32_t slot = EventSlotMap_lookup(&runner->eventSlotMap, eventType, eventSubtype);
+    if (0 > slot) return; // no object in this DataWin responds to (eventType, eventSubtype)
 
-    // Visit object buckets in ascending objectIndex order.
-    repeat(objectCount, objIdx) {
-        Instance** bucket = bucketsByObject[objIdx];
-        int32_t bucketCount = (int32_t) arrlen(bucket);
-        if (bucketCount == 0) continue;
-        // Only touch buckets whose object actually handles this event (including inherited from parent chain).
-        int32_t ownerObj = -1;
-        if (findEventCodeIdAndOwner(runner->dataWin, objIdx, eventType, eventSubtype, &ownerObj) < 0) {
-            arrfree(bucket);
-            continue;
+    // We always snapshot the iteration list before dispatching so instances spawned during this phase do NOT fire the current event.
+    Instance** scratch = runner->eventDispatchInstances;
+    arrsetlen(scratch, 0);
+
+    // On GMS 2.x, the native runner dispatches events in the eventUsesPerObjectDispatch set per-object. Route those through executeEventPerObject to match.
+    if (DataWin_isVersionAtLeast(runner->dataWin, 2, 0, 0, 0) && eventUsesBC17PerObjectDispatch(eventType)) {
+        ResolvedEventTable* table = &runner->eventTable;
+        uint32_t lo = table->bySlotStart[slot];
+        uint32_t hi = table->bySlotStart[slot + 1];
+        if (lo == hi) return;
+
+        for (uint32_t i = lo; hi > i; i++) {
+            int32_t concreteObj = table->bySlot[i].concreteObjectId;
+            Instance** bucket = runner->instancesByExactObject[concreteObj];
+            int32_t bucketCount = (int32_t) arrlen(bucket);
+            if (bucketCount == 0) continue;
+            size_t base = arrlenu(scratch);
+            arrsetlen(scratch, base + (size_t) bucketCount);
+            memcpy(&scratch[base], bucket, (size_t) bucketCount * sizeof(Instance*));
         }
-        repeat(bucketCount, i) {
-            Instance* inst = bucket[i];
+        runner->eventDispatchInstances = scratch; // arrsetlen may have realloced
+
+        int32_t snapshotCount = (int32_t) arrlen(scratch);
+        repeat(snapshotCount, i) {
+            Instance* inst = scratch[i];
             if (!inst->active) continue;
             Runner_executeEvent(runner, inst, eventType, eventSubtype);
         }
-        arrfree(bucket);
-    }
-
-    free(bucketsByObject);
-}
-
-void Runner_executeEventForAll(Runner* runner, int32_t eventType, int32_t eventSubtype) {
-    // On GMS 2.x, the native runner dispatches events in the eventUsesPerObjectDispatch set per-object. Route those through executeEventPerObject to match.
-    if (DataWin_isVersionAtLeast(runner->dataWin, 2, 0, 0, 0) && eventUsesBC17PerObjectDispatch(eventType)) {
-        executeEventPerObject(runner, eventType, eventSubtype);
         return;
     }
 
-    // All other events walk the room's active instance list in forward insertion order (oldest first).
-    // Ordering note: a room's own instances are loaded first at initRoom time, then persistent instances carried over from the previous room are appended at the end.
     int32_t count = (int32_t) arrlen(runner->instances);
-    // Snapshot the iteration list: events may create new instances (appended to runner->instances) and we do NOT want those to fire in this phase, matching GM semantics where only pre-existing instances run the current event phase.
-    Instance** snapshot = nullptr;
-    arrsetcap(snapshot, count);
+    if (count == 0) return;
+    arrsetlen(scratch, count);
+    memcpy(scratch, runner->instances, (size_t) count * sizeof(Instance*));
+    runner->eventDispatchInstances = scratch;
+
     repeat(count, i) {
-        arrput(snapshot, runner->instances[i]);
+        Instance* inst = scratch[i];
+        if (!inst->active) continue;
+        // Skip non-responders without entering Runner_executeEvent. ResolvedEventTable_lookup is a tiny CSR scan; non-responders bail in a few compares and avoid the VM state save/restore overhead inside Runner_executeEventFromObject.
+        if (0 > ResolvedEventTable_lookup(&runner->eventTable, inst->objectIndex, slot, nullptr)) continue;
+        Runner_executeEvent(runner, inst, eventType, eventSubtype);
     }
-    repeat(count, i) {
-        Instance* inst = snapshot[i];
-        if (inst->active) {
-            Runner_executeEvent(runner, inst, eventType, eventSubtype);
-        }
-    }
-    arrfree(snapshot);
 }
 
 // ===[ Background Scrolling & Drawing ]===
@@ -659,7 +642,7 @@ void Runner_draw(Runner* runner) {
             }
         } else if (d->type == DRAWABLE_INSTANCE) {
             Instance* inst = d->instance;
-            int32_t codeId = findEventCodeIdAndOwner(runner->dataWin, inst->objectIndex, EVENT_DRAW, DRAW_NORMAL, nullptr);
+            int32_t codeId = findEventCodeIdAndOwner(runner, inst->objectIndex, EVENT_DRAW, DRAW_NORMAL, nullptr);
             if (codeId >= 0) {
                 Runner_executeEvent(runner, inst, EVENT_DRAW, DRAW_NORMAL);
             } else if (runner->renderer != nullptr) {
@@ -1295,6 +1278,9 @@ void Runner_reset(Runner* runner) {
     if (runner->instancesByObject == nullptr) {
         runner->instancesByObject = safeCalloc(runner->dataWin->objt.count, sizeof(Instance**));
     }
+    if (runner->instancesByExactObject == nullptr) {
+        runner->instancesByExactObject = safeCalloc(runner->dataWin->objt.count, sizeof(Instance**));
+    }
 
     // Create the instance used for "self" in GLOB scripts
     Instance_free(runner->globalScopeInstance);
@@ -1306,6 +1292,39 @@ void Runner_reset(Runner* runner) {
     runner->mpPotAhead = 3.0;
     runner->mpPotOnSpot = true;
     runner->lastMusicInstance = -1;
+}
+
+// Populates objectsWithAnyEventOfType[eventType] from the resolved event table: for each event type, the deduplicated list of concrete object indices that respond to ANY subtype of that event. Walks the inverted bySlot index per slot and dedups via a scratch byte set.
+// Used by collision dispatch to skip non-collision objects in the outer loop, mirroring how the native obj_has_event table partitions instance iteration by event class.
+static void populateObjectsWithAnyEventOfType(Runner* runner) {
+    int32_t objectCount = (int32_t) runner->dataWin->objt.count;
+    runner->objectsWithAnyEventOfType = safeCalloc(OBJT_EVENT_TYPE_COUNT, sizeof(int32_t*));
+    if (objectCount == 0) return;
+
+    uint8_t* seen = safeCalloc((size_t) objectCount, 1);
+
+    repeat(OBJT_EVENT_TYPE_COUNT, t) {
+        int16_t* dense = runner->eventSlotMap.denseLookup[t];
+        if (dense == nullptr) continue;
+        int32_t maxSub = runner->eventSlotMap.maxSubtypeByType[t];
+        memset(seen, 0, (size_t) objectCount);
+
+        for (int32_t sub = 0; maxSub >= sub; sub++) {
+            int32_t slot = dense[sub];
+            if (0 > slot) continue;
+            uint32_t lo = runner->eventTable.bySlotStart[slot];
+            uint32_t hi = runner->eventTable.bySlotStart[slot + 1];
+            for (uint32_t i = lo; hi > i; i++) {
+                int32_t obj = runner->eventTable.bySlot[i].concreteObjectId;
+                if (obj < 0 || obj >= objectCount) continue;
+                if (seen[obj]) continue;
+                seen[obj] = 1;
+                arrput(runner->objectsWithAnyEventOfType[t], obj);
+            }
+        }
+    }
+
+    free(seen);
 }
 
 Runner* Runner_create(DataWin* dataWin, VMContext* vm, Renderer* renderer, FileSystem* fileSystem, AudioSystem* audioSystem) {
@@ -1326,7 +1345,13 @@ Runner* Runner_create(DataWin* dataWin, VMContext* vm, Renderer* renderer, FileS
     runner->keyboard = RunnerKeyboard_create();
     runner->gamepads = RunnerGamepad_create();
 
+    // Build the event dispatch acceleration tables.
+    EventSlotMap_build(&runner->eventSlotMap, dataWin);
+    ResolvedEventTable_build(&runner->eventTable, dataWin, &runner->eventSlotMap);
+
     Runner_reset(runner);
+
+    populateObjectsWithAnyEventOfType(runner);
 
     // Link runner to VM context
     vm->runner = (struct Runner*) runner;
@@ -1490,7 +1515,7 @@ static void executeCollisionEvent(Runner* runner, Instance* self, Instance* othe
     vm->otherInstance = other;
 
     int32_t ownerObjectIndex = -1;
-    int32_t codeId = findEventCodeIdAndOwner(runner->dataWin, self->objectIndex, EVENT_COLLISION, targetObjectIndex, &ownerObjectIndex);
+    int32_t codeId = findEventCodeIdAndOwner(runner, self->objectIndex, EVENT_COLLISION, targetObjectIndex, &ownerObjectIndex);
 
     vm->currentEventObjectIndex = ownerObjectIndex;
 
@@ -1516,11 +1541,25 @@ static void executeCollisionEvent(Runner* runner, Instance* self, Instance* othe
 
 static void dispatchCollisionEvents(Runner* runner) {
     DataWin* dataWin = runner->dataWin;
-    int32_t count = (int32_t) arrlen(runner->instances);
+    // Iterate only the objects that have any collision event in their parent chain.
+    int32_t* selfObjects = (runner->objectsWithAnyEventOfType != nullptr) ? runner->objectsWithAnyEventOfType[EVENT_COLLISION] : nullptr;
+    if (selfObjects == nullptr) return;
+    int32_t selfObjCount = (int32_t) arrlen(selfObjects);
 
-    repeat(count, i) {
-        Instance* self = runner->instances[i];
-        if (!self->active) continue;
+    repeat(selfObjCount, soIdx) {
+        int32_t selfObjIdx = selfObjects[soIdx];
+        Instance** selfBucket = runner->instancesByExactObject[selfObjIdx];
+        int32_t selfBucketCount = (int32_t) arrlen(selfBucket);
+        if (selfBucketCount == 0) continue;
+
+        // Snapshot the self bucket: collision handlers can spawn/destroy/instance_change. Iterating a snapshot also keeps newly-created instances from firing collisions in this same phase.
+        int32_t selfSnapBase = (int32_t) arrlen(runner->instanceSnapshots);
+        arrsetlen(runner->instanceSnapshots, selfSnapBase + selfBucketCount);
+        memcpy(&runner->instanceSnapshots[selfSnapBase], selfBucket, (size_t) selfBucketCount * sizeof(Instance*));
+
+        repeat(selfBucketCount, si) {
+            Instance* self = runner->instanceSnapshots[selfSnapBase + si];
+            if (!self->active) continue;
 
         InstanceBBox bboxSelf;
         Sprite* sprSelf;
@@ -1591,6 +1630,9 @@ static void dispatchCollisionEvents(Runner* runner) {
             currentObj = obj->parentId;
             depth++;
         }
+        }
+
+        arrsetlen(runner->instanceSnapshots, selfSnapBase);
     }
 }
 
@@ -1650,34 +1692,51 @@ static void updateViews(Runner* runner) {
 
 static void dispatchOutsideRoomEvents(Runner* runner) {
     DataWin* dataWin = runner->dataWin;
+    int32_t outsideSlot = EventSlotMap_lookup(&runner->eventSlotMap, EVENT_OTHER, OTHER_OUTSIDE_ROOM);
+    if (0 > outsideSlot) return;
+    ResolvedEventTable* table = &runner->eventTable;
+    uint32_t subLo = table->bySlotStart[outsideSlot];
+    uint32_t subHi = table->bySlotStart[outsideSlot + 1];
+    if (subLo == subHi) return;
+
     int32_t roomWidth = (int32_t) runner->currentRoom->width;
     int32_t roomHeight = (int32_t) runner->currentRoom->height;
-    int32_t count = (int32_t) arrlen(runner->instances);
 
-    repeat(count, i) {
-        Instance* inst = runner->instances[i];
-        if (!inst->active) continue;
+    for (uint32_t s = subLo; subHi > s; s++) {
+        int32_t objIdx = table->bySlot[s].concreteObjectId;
+        Instance** bucket = runner->instancesByExactObject[objIdx];
+        int32_t bucketCount = (int32_t) arrlen(bucket);
+        if (bucketCount == 0) continue;
 
-        // Early-out: skip instances whose object has no Outside Room event
-        if (0 > findEventCodeIdAndOwner(dataWin, inst->objectIndex, EVENT_OTHER, OTHER_OUTSIDE_ROOM, nullptr)) continue;
+        // Snapshot the bucket: an Outside Room handler can spawn/destroy/instance_change.
+        int32_t snapshotBase = (int32_t) arrlen(runner->instanceSnapshots);
+        arrsetlen(runner->instanceSnapshots, snapshotBase + bucketCount);
+        memcpy(&runner->instanceSnapshots[snapshotBase], bucket, (size_t) bucketCount * sizeof(Instance*));
 
-        // Compute bounding box
-        bool outside;
-        InstanceBBox bbox = Collision_computeBBox(dataWin, inst);
-        if (bbox.valid) {
-            outside = (0 > bbox.right || bbox.left > roomWidth || 0 > bbox.bottom || bbox.top > roomHeight);
-        } else {
-            // No sprite/mask: use raw position as a point
-            outside = (0 > inst->x || inst->x > roomWidth || 0 > inst->y || inst->y > roomHeight);
+        repeat(bucketCount, i) {
+            Instance* inst = runner->instanceSnapshots[snapshotBase + i];
+            if (!inst->active) continue;
+
+            bool outside;
+            InstanceBBox bbox = Collision_computeBBox(dataWin, inst);
+            if (bbox.valid) {
+                outside = (0 > bbox.right || bbox.left > roomWidth || 0 > bbox.bottom || bbox.top > roomHeight);
+            } else {
+                outside = (0 > inst->x || inst->x > roomWidth || 0 > inst->y || inst->y > roomHeight);
+            }
+
+            if (outside && !inst->outsideRoom) {
+                Runner_executeEvent(runner, inst, EVENT_OTHER, OTHER_OUTSIDE_ROOM);
+                if (runner->pendingRoom >= 0) {
+                    arrsetlen(runner->instanceSnapshots, snapshotBase);
+                    return;
+                }
+            }
+
+            inst->outsideRoom = outside;
         }
 
-        // Fire event only on inside-to-outside transition (edge-triggered)
-        if (outside && !inst->outsideRoom) {
-            Runner_executeEvent(runner, inst, EVENT_OTHER, OTHER_OUTSIDE_ROOM);
-            if (runner->pendingRoom >= 0) break;
-        }
-
-        inst->outsideRoom = outside;
+        arrsetlen(runner->instanceSnapshots, snapshotBase);
     }
 }
 
@@ -1950,38 +2009,54 @@ void Runner_step(Runner* runner) {
         }
     }
 
-    // Process alarms for all instances
-    int32_t alarmCount = (int32_t) arrlen(runner->instances);
-    repeat(alarmCount, i) {
-        Instance* inst = runner->instances[i];
-        if (!inst->active) continue;
-        if (inst->activeAlarmMask == 0) continue;
+    // Process alarms. Outer loop is over alarm slots (matching the native runner's HandleAlarm), and for each slot we walk only the objects in the event table's bySlot range and only those objects' exact instance buckets. Idle instances are further skipped via activeAlarmMask.
+    repeat(GML_ALARM_COUNT, alarmIdx) {
+        int32_t alarmSlot = EventSlotMap_lookup(&runner->eventSlotMap, EVENT_ALARM, alarmIdx);
+        if (0 > alarmSlot) continue;
+        ResolvedEventTable* table = &runner->eventTable;
+        uint32_t lo = table->bySlotStart[alarmSlot];
+        uint32_t hi = table->bySlotStart[alarmSlot + 1];
 
-        uint16_t mask = inst->activeAlarmMask;
-        while (mask != 0) {
-            int32_t alarmIdx = __builtin_ctz(mask);
-            mask &= (uint16_t) (mask - 1);
+        for (uint32_t s = lo; hi > s; s++) {
+            int32_t objIdx = table->bySlot[s].concreteObjectId;
+            Instance** bucket = runner->instancesByExactObject[objIdx];
+            int32_t bucketCount = (int32_t) arrlen(bucket);
+            if (bucketCount == 0) continue;
+
+            // Snapshot the bucket before dispatch: alarm code can call instance_change/instance_destroy/instance_create which mutate the live bucket. Iterating the snapshot also ensures newly-created instances do not fire alarms in this same phase.
+            int32_t snapshotBase = (int32_t) arrlen(runner->instanceSnapshots);
+            arrsetlen(runner->instanceSnapshots, snapshotBase + bucketCount);
+            memcpy(&runner->instanceSnapshots[snapshotBase], bucket, (size_t) bucketCount * sizeof(Instance*));
+
+            repeat(bucketCount, i) {
+                Instance* inst = runner->instanceSnapshots[snapshotBase + i];
+                if (!inst->active) continue;
+                uint16_t bit = (uint16_t) (1u << alarmIdx);
+                if ((inst->activeAlarmMask & bit) == 0) continue;
 
 #ifdef ENABLE_VM_TRACING
-            GameObject* object = &runner->dataWin->objt.objects[inst->objectIndex];
-            if (shgeti(runner->vmContext->alarmsToBeTraced, "*") != -1 || shgeti(runner->vmContext->alarmsToBeTraced, object->name) != -1) {
-                fprintf(stderr, "VM: [%s] Ticking down Alarm[%d] (instanceId=%d), current tick is %d\n", object->name, alarmIdx, inst->instanceId, inst->alarm[alarmIdx]);
-            }
-#endif
-
-            inst->alarm[alarmIdx]--;
-            if (inst->alarm[alarmIdx] == 0) {
-                inst->alarm[alarmIdx] = -1;
-                inst->activeAlarmMask &= (uint16_t) ~(1u << alarmIdx);
-
-#ifdef ENABLE_VM_TRACING
+                GameObject* object = &runner->dataWin->objt.objects[inst->objectIndex];
                 if (shgeti(runner->vmContext->alarmsToBeTraced, "*") != -1 || shgeti(runner->vmContext->alarmsToBeTraced, object->name) != -1) {
-                    fprintf(stderr, "VM: [%s] Firing Alarm[%d] (instanceId=%d)\n", object->name, alarmIdx, inst->instanceId);
+                    fprintf(stderr, "VM: [%s] Ticking down Alarm[%d] (instanceId=%d), current tick is %d\n", object->name, alarmIdx, inst->instanceId, inst->alarm[alarmIdx]);
                 }
 #endif
 
-                Runner_executeEvent(runner, inst, EVENT_ALARM, alarmIdx);
+                inst->alarm[alarmIdx]--;
+                if (inst->alarm[alarmIdx] == 0) {
+                    inst->alarm[alarmIdx] = -1;
+                    inst->activeAlarmMask &= (uint16_t) ~bit;
+
+#ifdef ENABLE_VM_TRACING
+                    if (shgeti(runner->vmContext->alarmsToBeTraced, "*") != -1 || shgeti(runner->vmContext->alarmsToBeTraced, object->name) != -1) {
+                        fprintf(stderr, "VM: [%s] Firing Alarm[%d] (instanceId=%d)\n", object->name, alarmIdx, inst->instanceId);
+                    }
+#endif
+
+                    Runner_executeEvent(runner, inst, EVENT_ALARM, alarmIdx);
+                }
             }
+
+            arrsetlen(runner->instanceSnapshots, snapshotBase);
         }
     }
 
@@ -2441,8 +2516,27 @@ void Runner_free(Runner* runner) {
         free(runner->instancesByObject);
         runner->instancesByObject = nullptr;
     }
+    if (runner->instancesByExactObject != nullptr) {
+        uint32_t objectCount = runner->dataWin->objt.count;
+        repeat(objectCount, i) {
+            arrfree(runner->instancesByExactObject[i]);
+        }
+        free(runner->instancesByExactObject);
+        runner->instancesByExactObject = nullptr;
+    }
+    if (runner->objectsWithAnyEventOfType != nullptr) {
+        repeat(OBJT_EVENT_TYPE_COUNT, t) {
+            arrfree(runner->objectsWithAnyEventOfType[t]);
+        }
+        free(runner->objectsWithAnyEventOfType);
+        runner->objectsWithAnyEventOfType = nullptr;
+    }
     arrfree(runner->instanceSnapshots);
     runner->instanceSnapshots = nullptr;
+    arrfree(runner->eventDispatchInstances);
+    runner->eventDispatchInstances = nullptr;
+    ResolvedEventTable_free(&runner->eventTable);
+    EventSlotMap_destroy(&runner->eventSlotMap);
 
     RunnerKeyboard_free(runner->keyboard);
     RunnerGamepad_free(runner->gamepads);

@@ -860,6 +860,7 @@ static void parseFONT(BinaryReader* reader, DataWin* dw) {
             font->glyphs = nullptr;
         }
         font->maxGlyphHeight = maxGlyphHeight;
+        Font_buildGlyphLUT(font);
         free(glyphPtrs);
     }
     free(ptrs);

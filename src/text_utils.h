@@ -14,6 +14,8 @@
 // Used by both the renderer (for drawing text) and the VM (for string_width/string_height).
 
 static inline FontGlyph* TextUtils_findGlyph(Font* font, uint16_t ch) {
+    // Fast path: ASCII codepoints go through a direct LUT, skipping the linear scan.
+    if (128 > ch) return font->glyphLUT[ch];
     repeat(font->glyphCount, i) {
         if (font->glyphs[i].character == ch) return &font->glyphs[i];
     }

@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "utils.h"
 
@@ -374,10 +375,24 @@ typedef struct {
     uint32_t glyphCount;
     FontGlyph* glyphs;
     uint32_t maxGlyphHeight; // Computed after glyph parse: max sourceHeight across glyphs; HTML5 runner uses this for line stride (see yyFont.TextHeight)
+    // ASCII fast-path lookup: glyphLUT[ch] for ch < 128, populated by Font_buildGlyphLUT after glyphs[] is filled.
+    // Lets TextUtils_findGlyph skip the linear scan over glyphs[] for the (overwhelmingly common) ASCII case.
+    FontGlyph* glyphLUT[128];
     // Sprite font fields (only valid when isSpriteFont is true)
     bool isSpriteFont;
     int32_t spriteIndex; // source sprite index (-1 for regular fonts)
 } Font;
+
+// Builds the ASCII fast-path lookup table from font->glyphs. Call after glyphs[] is fully populated.
+static inline void Font_buildGlyphLUT(Font* font) {
+    memset(font->glyphLUT, 0, sizeof(font->glyphLUT));
+    repeat(font->glyphCount, i) {
+        FontGlyph* g = &font->glyphs[i];
+        if (128 > g->character && font->glyphLUT[g->character] == nullptr) {
+            font->glyphLUT[g->character] = g;
+        }
+    }
+}
 
 typedef struct {
     uint32_t count;

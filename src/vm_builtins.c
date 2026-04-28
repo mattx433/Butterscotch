@@ -7620,6 +7620,7 @@ static RValue fontAddSpriteImpl(VMContext* ctx, int32_t spriteIndex, uint16_t* c
     font->maxGlyphHeight = maxHeight; // match what HTML5 runner uses for line stride
     font->isSpriteFont = true;
     font->spriteIndex = spriteIndex;
+    Font_buildGlyphLUT(font);
 
     return RValue_makeReal((GMLReal) newFontIndex);
 }

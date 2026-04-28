@@ -1092,6 +1092,125 @@ static void gsDrawSprite(Renderer* renderer, int32_t tpagIndex, float x, float y
     }
 }
 
+static void gsDrawTiled(Renderer* renderer, int32_t tpagIndex, float originX, float originY, float x, float y, float xscale, float yscale, bool tileX, bool tileY, float roomW, float roomH, uint32_t color, float alpha) {
+    GsRenderer* gs = (GsRenderer*) renderer;
+    DataWin* dw = renderer->dataWin;
+
+    if (0 > tpagIndex || (uint32_t) tpagIndex >= dw->tpag.count) return;
+
+    TexturePageItem* tpag = &dw->tpag.items[tpagIndex];
+
+    float cropX = 0.0f, cropY = 0.0f;
+    float cropW = (float) tpag->boundingWidth;
+    float cropH = (float) tpag->boundingHeight;
+    if (gs->atlasTPAGCount > (uint32_t) tpagIndex) {
+        AtlasTPAGEntry* entry = &gs->atlasTPAGEntries[tpagIndex];
+        if (entry->atlasId != 0xFFFF) {
+            cropX = (float) entry->cropX;
+            cropY = (float) entry->cropY;
+            cropW = (float) entry->cropW;
+            cropH = (float) entry->cropH;
+        }
+    }
+
+    float axScale = fabsf(xscale);
+    float ayScale = fabsf(yscale);
+    float tileW = (float) tpag->boundingWidth * axScale;
+    float tileH = (float) tpag->boundingHeight * ayScale;
+    if (0 >= tileW || 0 >= tileH) return;
+
+    float startX, endX, startY, endY;
+    if (tileX) {
+        startX = fmodf(x - originX * axScale, tileW);
+        if (startX > 0) startX -= tileW;
+        endX = roomW;
+    } else {
+        startX = x - originX * axScale;
+        endX = startX + tileW;
+    }
+    if (tileY) {
+        startY = fmodf(y - originY * ayScale, tileH);
+        if (startY > 0) startY -= tileH;
+        endY = roomH;
+    } else {
+        startY = y - originY * ayScale;
+        endY = startY + tileH;
+    }
+
+    // Per-tile quad layout in world space, derived from gsDrawSprite's axis-aligned path.
+    // For tile origin dx, the wrapper-equivalent x_call = dx + originX * axScale, then:
+    //   gameX1 = x_call + (cropX - originX) * xscale = dx + cropX * xscale + originX * (axScale - xscale)
+    // Same shape for Y. Both reduce to dx + cropX*xscale when xscale > 0 (the common case).
+    float dxLocalX0 = cropX * xscale + originX * (axScale - xscale);
+    float dyLocalY0 = cropY * yscale + originY * (ayScale - yscale);
+    float tileGameW = cropW * xscale;
+    float tileGameH = cropH * yscale;
+
+    GSTEXTURE tex;
+    if (!setupTextureForTPAG(gs, &tex, tpagIndex)) return;
+
+    AtlasTPAGEntry* atlasEntry = &gs->atlasTPAGEntries[tpagIndex];
+    float u0 = (float) atlasEntry->atlasX;
+    float v0 = (float) atlasEntry->atlasY;
+    float u1 = u0 + (float) atlasEntry->width;
+    float v1 = v0 + (float) atlasEntry->height;
+
+    // 0x80 is the exact 1.0x multiplier in GS modulate mode (output = texture * vertex / 128).
+    // So, to avoid dimming the texture (BGR_R(0xFFFFFF) >> 1 = 0x7F is 0.992x) we'll hand-pick the white case.
+    uint8_t r, g, b;
+    if (color == 0xFFFFFFu) {
+        r = g = b = 0x80;
+    } else {
+        r = BGR_R(color) >> 1;
+        g = BGR_G(color) >> 1;
+        b = BGR_B(color) >> 1;
+    }
+    uint8_t a = alphaToGS(alpha);
+    u64 gsColor = GS_SETREG_RGBAQ(r, g, b, a, 0x00);
+
+    float viewBaseX = -(float) gs->viewX;
+    float viewBaseY = -(float) gs->viewY;
+    float viewScaleX = gs->scaleX;
+    float viewScaleY = gs->scaleY;
+    float viewOffX = gs->offsetX;
+    float viewOffY = gs->offsetY;
+
+    // Integer tile counts avoid FP-comparison drift; the inner break handles overshoot at the boundary
+    int32_t tilesX = tileX ? ((int32_t) ((endX - startX) / tileW) + 1) : 1;
+    int32_t tilesY = tileY ? ((int32_t) ((endY - startY) / tileH) + 1) : 1;
+    if (0 >= tilesX || 0 >= tilesY) return;
+
+    repeat(tilesY, iy) {
+        float dy = startY + (float) iy * tileH;
+        if (dy >= endY) break;
+
+        float gameY1 = dy + dyLocalY0 + viewBaseY;
+        float gameY2 = gameY1 + tileGameH;
+        float sy0 = gameY1 * viewScaleY + viewOffY;
+        float sy1 = gameY2 * viewScaleY + viewOffY;
+
+        float minSY = sy0 < sy1 ? sy0 : sy1;
+        float maxSY = sy0 > sy1 ? sy0 : sy1;
+        if (0.0f > maxSY || minSY > PS2_SCREEN_HEIGHT) continue;
+
+        repeat(tilesX, ix) {
+            float dx = startX + (float) ix * tileW;
+            if (endX <= dx) break;
+
+            float gameX1 = dx + dxLocalX0 + viewBaseX;
+            float gameX2 = gameX1 + tileGameW;
+            float sx0 = gameX1 * viewScaleX + viewOffX;
+            float sx1 = gameX2 * viewScaleX + viewOffX;
+
+            float minSX = sx0 < sx1 ? sx0 : sx1;
+            float maxSX = sx0 > sx1 ? sx0 : sx1;
+            if (0.0f > maxSX || minSX > PS2_SCREEN_WIDTH) continue;
+
+            gsKit_prim_sprite_texture(gs->gsGlobal, &tex, sx0, sy0, u0, v0, sx1, sy1, u1, v1, 0, gsColor);
+        }
+    }
+}
+
 static void gsDrawSpritePart(Renderer* renderer, int32_t tpagIndex, int32_t srcOffX, int32_t srcOffY, int32_t srcW, int32_t srcH, float x, float y, float xscale, float yscale, uint32_t color, float alpha) {
     GsRenderer* gs = (GsRenderer*) renderer;
 
@@ -1686,6 +1805,7 @@ static RendererVtable gsVtable = {
     .createSpriteFromSurface = gsCreateSpriteFromSurface,
     .deleteSprite = gsDeleteSprite,
     .drawTile = gsDrawTile,
+    .drawTiled = gsDrawTiled,
 };
 
 // ===[ Public API ]===

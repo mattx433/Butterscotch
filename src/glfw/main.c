@@ -519,6 +519,46 @@ static int32_t glfwKeyToGml(int glfwKey) {
 
 static InputRecording* globalInputRecording = nullptr;
 
+#if defined(__has_feature)
+    #if __has_feature(address_sanitizer)
+        #define BUTTERSCOTCH_HAS_ASAN 1
+    #endif
+#endif
+#if defined(__SANITIZE_ADDRESS__)
+    #define BUTTERSCOTCH_HAS_ASAN 1
+#endif
+
+#if BUTTERSCOTCH_HAS_ASAN
+void __asan_set_death_callback(void (*callback)(void));
+#endif
+
+static volatile sig_atomic_t crashSaveInProgress = 0;
+
+static void saveRecordingOnCrash(void) {
+    if (crashSaveInProgress) return;
+    crashSaveInProgress = 1;
+    if (globalInputRecording != nullptr && globalInputRecording->isRecording) {
+        InputRecording_save(globalInputRecording);
+    }
+}
+
+static void crashSignalHandler(int sig) {
+    saveRecordingOnCrash();
+    signal(sig, SIG_DFL);
+    raise(sig);
+}
+
+static void installCrashHandlers(void) {
+#if BUTTERSCOTCH_HAS_ASAN
+    __asan_set_death_callback(saveRecordingOnCrash);
+#endif
+    signal(SIGSEGV, crashSignalHandler);
+    signal(SIGABRT, crashSignalHandler);
+    signal(SIGBUS,  crashSignalHandler);
+    signal(SIGFPE,  crashSignalHandler);
+    signal(SIGILL,  crashSignalHandler);
+}
+
 static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
     (void) scancode; (void) mods;
     Runner* runner = (Runner*) glfwGetWindowUserPointer(window);
@@ -811,6 +851,9 @@ int main(int argc, char* argv[]) {
         globalInputRecording = InputRecording_createPlayer(args.playbackInputsPath, args.recordInputsPath);
     } else if (args.recordInputsPath != nullptr) {
         globalInputRecording = InputRecording_createRecorder(args.recordInputsPath);
+    }
+    if (globalInputRecording != nullptr) {
+        installCrashHandlers();
     }
     shcopyFromTo(args.varReadsToBeTraced, runner->vmContext->varReadsToBeTraced);
     shcopyFromTo(args.varWritesToBeTraced, runner->vmContext->varWritesToBeTraced);

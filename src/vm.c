@@ -1528,10 +1528,7 @@ static void handleDiv(VMContext* ctx, uint32_t instr) {
     RValue b = stackPop(ctx);
     RValue a = stackPop(ctx);
     GMLReal divisor = RValue_toReal(b);
-    if (divisor == 0.0) {
-        fprintf(stderr, "VM: DoDiv :: Divide by zero\n");
-        abort();
-    }
+    requireMessageFormatted(divisor != 0.0, "VM: [%s] DoDiv :: Divide by zero", ctx->currentCodeName);
     GMLReal result = RValue_toReal(a) / divisor;
     RValue_free(&a);
     RValue_free(&b);
@@ -1542,10 +1539,7 @@ static void handleRem(VMContext* ctx, uint32_t instr) {
     RValue b = stackPop(ctx);
     RValue a = stackPop(ctx);
     int32_t ib = RValue_toInt32(b);
-    if (ib == 0) {
-        fprintf(stderr, "VM: DoRem :: Divide by zero\n");
-        abort();
-    }
+    requireMessageFormatted(ib != 0.0, "VM: [%s] DoRem :: Divide by zero", ctx->currentCodeName);
     int32_t result = RValue_toInt32(a) % ib;
     RValue_free(&a);
     RValue_free(&b);
@@ -1556,10 +1550,7 @@ static void handleMod(VMContext* ctx, uint32_t instr) {
     RValue b = stackPop(ctx);
     RValue a = stackPop(ctx);
     GMLReal divisor = RValue_toReal(b);
-    if (divisor == 0.0) {
-        fprintf(stderr, "VM: DoMod :: Divide by zero\n");
-        abort();
-    }
+    requireMessageFormatted(divisor != 0.0, "VM: [%s] DoMod :: Divide by zero", ctx->currentCodeName);
     GMLReal result = GMLReal_fmod(RValue_toReal(a), divisor);
     RValue_free(&a);
     RValue_free(&b);

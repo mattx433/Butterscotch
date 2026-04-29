@@ -8,9 +8,17 @@
 
 #define GML_ALARM_COUNT 12
 
+// Forward decl for Instance_structDecRef
+struct Runner;
+
 typedef struct Instance {
     uint32_t instanceId;
     int32_t objectIndex;
+    // Reference count for GML structs (objectIndex == -1 mode). Unused for game-object instances.
+    // The runner's structInstances registry holds an implicit +1 ref while the struct is registered, so a refCount of 1 means "only the registry references this"; the per-frame sweep (Runner_sweepDeadStructs) decRefs those to free them. RValues with ownsReference=true on RVALUE_STRUCT contribute one ref each.
+    int32_t refCount;
+    // Position of this struct in runner->structInstances (for O(1) swap-remove when freed). -1 when not registered.
+    int32_t structRegistryIndex;
     // Native GMS runner stores all instance built-in variables as float (32-bit),
     // even though RValues use double. This matches the native precision model.
     float x, y;
@@ -56,6 +64,11 @@ typedef struct Instance {
 Instance* Instance_create(uint32_t instanceId, int32_t objectIndex, GMLReal x, GMLReal y);
 void Instance_free(Instance* instance);
 
+// GML-struct refcount helpers. Only meaningful when inst->objectIndex == -1.
+// incRef: bumps the count. decRef: drops the count. Never frees on its own; the per-frame sweep (Runner_sweepDeadStructs) is the single point that physically frees a struct (after dropping the registry's implicit ref).
+void Instance_structIncRef(Instance* inst);
+void Instance_structDecRef(Instance* inst);
+
 // Deep-copy all mutable fields from source to dst: built-in properties, alarms, selfVars.
 // Does NOT copy instanceId, objectIndex, destroyed, or createEventFired. Strings are duplicated so ownership stays independent. Arrays bump refCount (shared - CoW handles forking on first write).
 void Instance_copyFields(Instance* dst, Instance* source);
@@ -78,12 +91,15 @@ static inline void Instance_setSelfVar(Instance* inst, int32_t varID, RValue val
         val = RValue_makeOwnedString(safeStrdup(val.string));
     } else if (val.type == RVALUE_ARRAY && val.array != nullptr) {
         GMLArray_incRef(val.array);
-        val.ownsString = true;
+        val.ownsReference = true;
 #if IS_BC17_OR_HIGHER_ENABLED
     } else if (val.type == RVALUE_METHOD && val.method != nullptr) {
         GMLMethod_incRef(val.method);
-        val.ownsString = true;
+        val.ownsReference = true;
 #endif
+    } else if (val.type == RVALUE_STRUCT && val.structInst != nullptr) {
+        Instance_structIncRef(val.structInst);
+        val.ownsReference = true;
     }
     *slot = val;
 }

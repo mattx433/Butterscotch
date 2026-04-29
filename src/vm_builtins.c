@@ -705,7 +705,7 @@ RValue VMBuiltins_getVariable(VMContext* ctx, int16_t builtinVarId, const char* 
         case BUILTIN_VAR_ARGUMENT: {
             if (ctx->scriptArgs != nullptr && ctx->scriptArgCount > arrayIndex && arrayIndex >= 0) {
                 RValue val = ctx->scriptArgs[arrayIndex];
-                val.ownsString = false;
+                val.ownsReference = false;
                 return val;
             }
             return RValue_makeUndefined();
@@ -714,7 +714,7 @@ RValue VMBuiltins_getVariable(VMContext* ctx, int16_t builtinVarId, const char* 
             int argNumber = builtinVarId - BUILTIN_VAR_ARGUMENT0;
             if (ctx->scriptArgs != nullptr && ctx->scriptArgCount > argNumber) {
                 RValue val = ctx->scriptArgs[argNumber];
-                val.ownsString = false;
+                val.ownsReference = false;
                 return val;
             }
             return RValue_makeUndefined();
@@ -2149,7 +2149,7 @@ static RValue builtinVariableGlobalGet(VMContext* ctx, RValue* args, int32_t arg
     if (ctx->globalVarCount > (uint32_t) varID) {
         RValue val = ctx->globalVars[varID];
         // Duplicate owned strings
-        if (val.type == RVALUE_STRING && val.ownsString && val.string != nullptr) {
+        if (val.type == RVALUE_STRING && val.ownsReference && val.string != nullptr) {
             return RValue_makeOwnedString(safeStrdup(val.string));
         }
         return val;
@@ -2204,7 +2204,7 @@ static RValue variableInstanceGetOn(VMContext* ctx, Instance* target, const char
         RValue val = VMBuiltins_getVariable(ctx, builtinId, name, -1);
         ctx->currentInstance = saved;
         // Duplicate string so caller-owned args cleanup does not affect it
-        if (val.type == RVALUE_STRING && val.string != nullptr && !val.ownsString) {
+        if (val.type == RVALUE_STRING && val.string != nullptr && !val.ownsReference) {
             return RValue_makeOwnedString(safeStrdup(val.string));
         }
         return val;
@@ -2656,16 +2656,20 @@ static RValue builtinArrayPush(MAYBE_UNUSED VMContext* ctx, RValue* args, int32_
                 *slot = RValue_makeOwnedString(safeStrdup(val.string));
             } else if (val.type == RVALUE_ARRAY && val.array != nullptr) {
                 GMLArray_incRef(val.array);
-                val.ownsString = true;
+                val.ownsReference = true;
                 *slot = val;
 #if IS_BC17_OR_HIGHER_ENABLED
             } else if (val.type == RVALUE_METHOD && val.method != nullptr) {
                 GMLMethod_incRef(val.method);
-                val.ownsString = true;
+                val.ownsReference = true;
                 *slot = val;
 #endif
+            } else if (val.type == RVALUE_STRUCT && val.structInst != nullptr) {
+                Instance_structIncRef(val.structInst);
+                val.ownsReference = true;
+                *slot = val;
             } else {
-                val.ownsString = false;
+                val.ownsReference = false;
                 *slot = val;
             }
         }
@@ -6410,7 +6414,7 @@ static RValue builtinActionIfVariable(VMContext* ctx, MAYBE_UNUSED RValue* args,
 
     int32_t idx = check ? 1 : 2;
     RValue result = args[idx];
-    args[idx].ownsString = false; // Steal ownership to avoid double-free in handleCall
+    args[idx].ownsReference = false; // Steal ownership to avoid double-free in handleCall
     return result;
 }
 
@@ -7109,7 +7113,10 @@ static RValue builtinNewGMLObject(VMContext* ctx, RValue* args, int32_t argCount
 
     Instance* structInst = Instance_create(runner->nextInstanceId++, -1, 0, 0);
     hmput(runner->instancesToId, structInst->instanceId, structInst);
+    structInst->structRegistryIndex = (int32_t) arrlen(runner->structInstances);
     arrput(runner->structInstances, structInst);
+    // Two refs at birth: one for the registry's implicit ref (structInstances), one for the returned RValue.
+    structInst->refCount = 2;
 
     Instance* savedSelf = (Instance*) ctx->currentInstance;
     ctx->currentInstance = structInst;
@@ -7120,7 +7127,7 @@ static RValue builtinNewGMLObject(VMContext* ctx, RValue* args, int32_t argCount
     RValue_free(&result);
 
     ctx->currentInstance = savedSelf;
-    return RValue_makeInt32((int32_t) structInst->instanceId);
+    return RValue_makeStruct(structInst);
 }
 #endif
 
@@ -7561,7 +7568,7 @@ static RValue builtinStringHashToNewline(MAYBE_UNUSED VMContext* ctx, RValue* ar
     PreprocessedText result = TextUtils_preprocessGmlText(original.string);
     if (!result.owning) {
         // No # found, steal the reference to avoid copying the string
-        args[0].ownsString = false;
+        args[0].ownsReference = false;
         return original;
     }
     return RValue_makeOwnedString((char*) result.text);

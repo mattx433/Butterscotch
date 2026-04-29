@@ -12,6 +12,8 @@ Instance* Instance_create(uint32_t instanceId, int32_t objectIndex, GMLReal x, G
     Instance* inst = safeCalloc(1, sizeof(Instance));
     inst->instanceId = instanceId;
     inst->objectIndex = objectIndex;
+    inst->refCount = 0;
+    inst->structRegistryIndex = -1;
     inst->x = (float) x;
     inst->y = (float) y;
     inst->xprevious = (float) x;
@@ -51,6 +53,22 @@ Instance* Instance_create(uint32_t instanceId, int32_t objectIndex, GMLReal x, G
     }
 
     return inst;
+}
+
+void Instance_structIncRef(Instance* inst) {
+    if (inst == nullptr) return;
+    inst->refCount++;
+}
+
+void Instance_structDecRef(Instance* inst) {
+    if (inst == nullptr) return;
+    require(inst->refCount > 0);
+    inst->refCount--;
+    // Never free here. The runner-side sweep reaps structs whose refCount has dropped to 1. (that is: when only the structInstances holds it)
+}
+
+uint32_t Instance_getInstanceId(Instance* inst) {
+    return inst != nullptr ? inst->instanceId : 0;
 }
 
 void Instance_free(Instance* instance) {

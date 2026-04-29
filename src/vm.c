@@ -233,7 +233,7 @@ static uint32_t resolveFuncOperand(const uint8_t* extraData) {
 // All arrays live as RVALUE_ARRAY (GMLArray*) inside a scalar variable slot (self vars, global vars, or local vars).
 // Variable reads return the RValue (which may be an array pointer) and variable writes update the slot directly.
 //
-// Reads return a weak view of the slot value - callers must incRef + set ownsString if they want to retain it.
+// Reads return a weak view of the slot value - callers must incRef + set ownsReference if they want to retain it.
 //
 // Writes (VARTYPE_ARRAY Pop, BREAK_POPAF, BREAK_PUSHAC materialisation) go through VM_arrayWriteAt,
 // which handles:
@@ -256,7 +256,7 @@ static RValue VM_arrayReadAt(RValue* slot, int32_t index) {
         return (RValue){ .type = RVALUE_UNDEFINED };
     }
     RValue result = *cell;
-    result.ownsString = false;
+    result.ownsReference = false;
     return result;
 }
 
@@ -268,16 +268,20 @@ static void storeIntoArraySlot(RValue* slot, RValue val) {
         *slot = RValue_makeOwnedString(safeStrdup(val.string));
     } else if (val.type == RVALUE_ARRAY && val.array != nullptr) {
         GMLArray_incRef(val.array);
-        val.ownsString = true;
+        val.ownsReference = true;
         *slot = val;
 #if IS_BC17_OR_HIGHER_ENABLED
     } else if (val.type == RVALUE_METHOD && val.method != nullptr) {
         GMLMethod_incRef(val.method);
-        val.ownsString = true;
+        val.ownsReference = true;
         *slot = val;
 #endif
+    } else if (val.type == RVALUE_STRUCT && val.structInst != nullptr) {
+        Instance_structIncRef(val.structInst);
+        val.ownsReference = true;
+        *slot = val;
     } else {
-        val.ownsString = false;
+        val.ownsReference = false;
         *slot = val;
     }
 }
@@ -323,7 +327,7 @@ static GMLArray* VM_arrayWriteAt(VMContext* ctx, RValue* slot, int32_t index, RV
         GMLArray* clone = GMLArray_clone(arr, intendedOwner);
         GMLArray_decRef(arr);
         slot->array = clone;
-        slot->ownsString = true;
+        slot->ownsReference = true;
         arr = clone;
     } else if (arr->owner == nullptr) {
         // Claim ownership on first write to an unowned array (e.g. freshly allocated by a builtin).
@@ -527,20 +531,20 @@ static inline bool tryFastVarRead(VMContext* ctx, int32_t instanceType, Variable
             if (inst == nullptr) return false;
             RValue* slot = IntRValueHashMap_findSlot(&inst->selfVars, varDef->varID);
             *out = (slot != nullptr) ? *slot : (RValue){ .type = RVALUE_UNDEFINED };
-            out->ownsString = false;
+            out->ownsReference = false;
             return true;
         }
         case INSTANCE_LOCAL: {
             uint32_t localSlot = resolveLocalSlot(ctx, varDef->varID);
             require(ctx->localVarCount > localSlot);
             *out = ctx->localVars[localSlot];
-            out->ownsString = false;
+            out->ownsReference = false;
             return true;
         }
         case INSTANCE_GLOBAL: {
             require(ctx->globalVarCount > (uint32_t) varDef->varID);
             *out = ctx->globalVars[varDef->varID];
-            out->ownsString = false;
+            out->ownsReference = false;
             return true;
         }
         case INSTANCE_OTHER: {
@@ -548,7 +552,7 @@ static inline bool tryFastVarRead(VMContext* ctx, int32_t instanceType, Variable
             if (inst == nullptr) return false;
             RValue* slot = IntRValueHashMap_findSlot(&inst->selfVars, varDef->varID);
             *out = (slot != nullptr) ? *slot : (RValue){ .type = RVALUE_UNDEFINED };
-            out->ownsString = false;
+            out->ownsReference = false;
             return true;
         }
     }
@@ -602,7 +606,7 @@ static RValue resolveVariableRead(VMContext* ctx, int32_t instanceType, uint32_t
             int32_t idx = access.arrayIndex;
             if (ctx->scriptArgs != nullptr && ctx->scriptArgCount > idx && idx >= 0) {
                 result = ctx->scriptArgs[idx];
-                result.ownsString = false;
+                result.ownsReference = false;
             } else {
                 result = RValue_makeUndefined();
             }
@@ -610,7 +614,7 @@ static RValue resolveVariableRead(VMContext* ctx, int32_t instanceType, uint32_t
             int32_t argIndex = bid - BUILTIN_VAR_ARGUMENT0;
             if (ctx->scriptArgs != nullptr && ctx->scriptArgCount > argIndex) {
                 result = ctx->scriptArgs[argIndex];
-                result.ownsString = false;
+                result.ownsReference = false;
                 // If we are trying to access the argument via an array (example: argName[i]), we NEED to read INSIDE the array
                 // Example:
                 // function init(arg2) {
@@ -644,7 +648,7 @@ static RValue resolveVariableRead(VMContext* ctx, int32_t instanceType, uint32_t
                 RValue* peekSlot = IntRValueHashMap_findSlot(&peekInst->selfVars, varDef->varID);
                 if (peekSlot != nullptr) {
                     RValue val = *peekSlot;
-                    val.ownsString = false;
+                    val.ownsReference = false;
                     return val;
                 }
             }
@@ -660,10 +664,10 @@ static RValue resolveVariableRead(VMContext* ctx, int32_t instanceType, uint32_t
         ptrdiff_t bidx = shgeti(ctx->builtinMap, (char*) varDef->name);
         if (bidx >= 0) {
             BuiltinFunc bf = ctx->builtinMap[bidx].value;
-            return (RValue){ .method = GMLMethod_createBuiltin(bf, -1), .type = RVALUE_METHOD, .ownsString = true, .gmlStackType = GML_TYPE_VARIABLE };
+            return (RValue){ .method = GMLMethod_createBuiltin(bf, -1), .type = RVALUE_METHOD, .ownsReference = true, .gmlStackType = GML_TYPE_VARIABLE };
         }
         // Unresolved: return a method stub so CallV can log a single "unknown function" and return undefined instead of bailing out with a scary "unresolvable function reference" error.
-        return (RValue){ .method = GMLMethod_createUnresolved(varDef->name, -1), .type = RVALUE_METHOD, .ownsString = true, .gmlStackType = GML_TYPE_VARIABLE };
+        return (RValue){ .method = GMLMethod_createUnresolved(varDef->name, -1), .type = RVALUE_METHOD, .ownsReference = true, .gmlStackType = GML_TYPE_VARIABLE };
     }
 #endif
 
@@ -757,7 +761,7 @@ static RValue resolveVariableRead(VMContext* ctx, int32_t instanceType, uint32_t
 
     // Scalar access: return the slot's current value as a weak view (slot retains ownership).
     RValue result = *slot;
-    result.ownsString = false;
+    result.ownsReference = false;
 
 #ifdef ENABLE_VM_TRACING
     // Read tracing for scalar variables
@@ -804,21 +808,25 @@ static void writeSingleInstanceVariable(VMContext* ctx, Instance* inst, Variable
 
 // Transfer ownership of "val into "*dest", freeing the old value first.
 // Strings are duplicated only if the source view is non-owning (so we don't double-free).
-// Arrays/methods bump refcount when needed and flip the source's ownsString flag to take a strong ref.
+// Arrays/methods/structs bump refcount when needed and flip the source's ownsReference flag to take a strong ref.
 static inline void writeIntoSlot(RValue* dest, RValue val) {
     RValue_free(dest);
-    if (val.type == RVALUE_STRING && !val.ownsString && val.string != nullptr) {
+    if (val.type == RVALUE_STRING && !val.ownsReference && val.string != nullptr) {
         *dest = RValue_makeOwnedString(safeStrdup(val.string));
     } else if (val.type == RVALUE_ARRAY && val.array != nullptr) {
-        if (!val.ownsString) GMLArray_incRef(val.array);
-        val.ownsString = true;
+        if (!val.ownsReference) GMLArray_incRef(val.array);
+        val.ownsReference = true;
         *dest = val;
 #if IS_BC17_OR_HIGHER_ENABLED
     } else if (val.type == RVALUE_METHOD && val.method != nullptr) {
-        if (!val.ownsString) GMLMethod_incRef(val.method);
-        val.ownsString = true;
+        if (!val.ownsReference) GMLMethod_incRef(val.method);
+        val.ownsReference = true;
         *dest = val;
 #endif
+    } else if (val.type == RVALUE_STRUCT && val.structInst != nullptr) {
+        if (!val.ownsReference) Instance_structIncRef(val.structInst);
+        val.ownsReference = true;
+        *dest = val;
     } else {
         *dest = val;
     }
@@ -950,7 +958,7 @@ static void resolveVariableWrite(VMContext* ctx, int32_t instanceType, uint32_t 
             } else {
                 // Transfer ownership from val into scriptArgs: copy the tagged union as-is and neutralize val so the RValue_free below is a no-op for arrays/methods.
                 ctx->scriptArgs[writeIndex] = val;
-                val.ownsString = false;
+                val.ownsReference = false;
             }
             if (writeIndex >= ctx->scriptArgCount) {
                 ctx->scriptArgCount = writeIndex + 1;
@@ -1203,7 +1211,7 @@ static void handlePush(VMContext* ctx, uint32_t instr, const uint8_t* extraData,
                     RValue_free(topSlot);
                     GMLArray* sub = GMLArray_create(0);
                     sub->owner = top->owner;
-                    *topSlot = (RValue){ .array = sub, .type = RVALUE_ARRAY, .ownsString = true, RVALUE_INIT_GMLTYPE(GML_TYPE_VARIABLE) };
+                    *topSlot = (RValue){ .array = sub, .type = RVALUE_ARRAY, .ownsReference = true, RVALUE_INIT_GMLTYPE(GML_TYPE_VARIABLE) };
                 }
                 // Push a weak ref to the sub-array — short-lived, consumed by the next BREAK op.
                 stackPush(ctx, RValue_makeArrayWeak(topSlot->array));
@@ -1741,6 +1749,14 @@ static void handleCmp(VMContext* ctx, uint32_t instr) {
             default:      result = false; break;
         }
 #endif
+    } else if (a.type == RVALUE_STRUCT || b.type == RVALUE_STRUCT) {
+        // Struct is only == to the same struct (identity comparison)
+        bool eq = (a.type == RVALUE_STRUCT && b.type == RVALUE_STRUCT) && (a.structInst == b.structInst);
+        switch (cmpKind) {
+            case CMP_EQ:  result = eq;  break;
+            case CMP_NEQ: result = !eq; break;
+            default:      result = false; break;
+        }
     } else if (a.type == RVALUE_STRING && b.type == RVALUE_STRING) {
         int cmp = strcmp(a.string != nullptr ? a.string : "", b.string != nullptr ? b.string : "");
         switch (cmpKind) {
@@ -1890,14 +1906,16 @@ static void handleDup(VMContext* ctx, uint32_t instr) {
 
         // If the value owns a string, duplicate it to avoid double-free.
         // For arrays and methods, bump the refcount so each duplicate independently owns a reference.
-        if (copy.type == RVALUE_STRING && copy.ownsString && copy.string != nullptr) {
+        if (copy.type == RVALUE_STRING && copy.ownsReference && copy.string != nullptr) {
             copy.string = safeStrdup(copy.string);
-        } else if (copy.type == RVALUE_ARRAY && copy.ownsString && copy.array != nullptr) {
+        } else if (copy.type == RVALUE_ARRAY && copy.ownsReference && copy.array != nullptr) {
             GMLArray_incRef(copy.array);
 #if IS_BC17_OR_HIGHER_ENABLED
-        } else if (copy.type == RVALUE_METHOD && copy.ownsString && copy.method != nullptr) {
+        } else if (copy.type == RVALUE_METHOD && copy.ownsReference && copy.method != nullptr) {
             GMLMethod_incRef(copy.method);
 #endif
+        } else if (copy.type == RVALUE_STRUCT && copy.ownsReference && copy.structInst != nullptr) {
+            Instance_structIncRef(copy.structInst);
         }
 
         stackPush(ctx, copy);
@@ -2335,6 +2353,7 @@ static const char* rvalueTypeName(uint8_t type) {
         case RVALUE_UNDEFINED: return "UNDEF";
         case RVALUE_ARRAY:     return "ARRAY";
         case RVALUE_METHOD:    return "METHOD";
+        case RVALUE_STRUCT:    return "STRUCT";
         case 0xF:              return "-";
         default:               return "???";
     }
@@ -2518,7 +2537,7 @@ static void handleBreakPushAF(VMContext* ctx) {
     RValue* cell = arrayRef.type == RVALUE_ARRAY ? GMLArray_slot(arrayRef.array, idx) : nullptr;
     if (cell != nullptr) {
         result = *cell;
-        result.ownsString = false; // weak view
+        result.ownsReference = false; // weak view
     } else {
         result = (RValue){ .type = RVALUE_UNDEFINED };
     }
@@ -2559,7 +2578,7 @@ static void handleBreakPushAC(VMContext* ctx, uint32_t instrAddr) {
         RValue_free(parentSlot);
         GMLArray* sub = GMLArray_create(0);
         sub->owner = parent->owner;
-        *parentSlot = (RValue){ .array = sub, .type = RVALUE_ARRAY, .ownsString = true, RVALUE_INIT_GMLTYPE(GML_TYPE_VARIABLE) };
+        *parentSlot = (RValue){ .array = sub, .type = RVALUE_ARRAY, .ownsReference = true, RVALUE_INIT_GMLTYPE(GML_TYPE_VARIABLE) };
     }
     stackPush(ctx, RValue_makeArrayWeak(parentSlot->array));
     RValue_free(&arrayRef);
@@ -2748,7 +2767,7 @@ static RValue executeLoop(VMContext* ctx) {
                 uint32_t localSlot = resolveLocalSlot(ctx, varDef->varID);
                 require(ctx->localVarCount > localSlot);
                 RValue val = ctx->localVars[localSlot];
-                val.ownsString = false;
+                val.ownsReference = false;
                 stackPushTyped(ctx, val, GML_TYPE_VARIABLE);
                 break;
             }
@@ -2767,7 +2786,7 @@ static RValue executeLoop(VMContext* ctx) {
                 Variable* varDef = resolveVarDef(ctx, varRef);
                 require(ctx->globalVarCount > (uint32_t) varDef->varID);
                 RValue val = ctx->globalVars[varDef->varID];
-                val.ownsString = false;
+                val.ownsReference = false;
                 stackPushTyped(ctx, val, GML_TYPE_VARIABLE);
                 break;
             }
@@ -3437,16 +3456,19 @@ RValue VM_callCodeIndex(VMContext* ctx, int32_t codeIndex, RValue* args, int32_t
     if (argCount > 0 && args != nullptr) {
         repeat(argCount, argIdx) {
             RValue argCopy = args[argIdx];
-            if (argCopy.type == RVALUE_STRING && argCopy.ownsString && argCopy.string != nullptr) {
+            if (argCopy.type == RVALUE_STRING && argCopy.ownsReference && argCopy.string != nullptr) {
                 argCopy.string = safeStrdup(argCopy.string);
             } else if (argCopy.type == RVALUE_ARRAY && argCopy.array != nullptr) {
                 GMLArray_incRef(argCopy.array);
-                argCopy.ownsString = true;
+                argCopy.ownsReference = true;
 #if IS_BC17_OR_HIGHER_ENABLED
             } else if (argCopy.type == RVALUE_METHOD && argCopy.method != nullptr) {
                 GMLMethod_incRef(argCopy.method);
-                argCopy.ownsString = true;
+                argCopy.ownsReference = true;
 #endif
+            } else if (argCopy.type == RVALUE_STRUCT && argCopy.structInst != nullptr) {
+                Instance_structIncRef(argCopy.structInst);
+                argCopy.ownsReference = true;
             }
             ctx->scriptArgs[argIdx] = argCopy;
         }
@@ -3467,16 +3489,19 @@ RValue VM_callCodeIndex(VMContext* ctx, int32_t codeIndex, RValue* args, int32_t
 
     // Strengthen result BEFORE freeing callee locals/scriptArgs: if result is a weak view into callee state, the upcoming frees would leave a dangling pointer.
     // For owning results, the refCount/string buffer stays valid (the callee transferred one ownership slot to us).
-    if (result.type == RVALUE_STRING && !result.ownsString && result.string != nullptr) {
+    if (result.type == RVALUE_STRING && !result.ownsReference && result.string != nullptr) {
         result = RValue_makeOwnedString(safeStrdup(result.string));
-    } else if (result.type == RVALUE_ARRAY && !result.ownsString && result.array != nullptr) {
+    } else if (result.type == RVALUE_ARRAY && !result.ownsReference && result.array != nullptr) {
         GMLArray_incRef(result.array);
-        result.ownsString = true;
+        result.ownsReference = true;
 #if IS_BC17_OR_HIGHER_ENABLED
-    } else if (result.type == RVALUE_METHOD && !result.ownsString && result.method != nullptr) {
+    } else if (result.type == RVALUE_METHOD && !result.ownsReference && result.method != nullptr) {
         GMLMethod_incRef(result.method);
-        result.ownsString = true;
+        result.ownsReference = true;
 #endif
+    } else if (result.type == RVALUE_STRUCT && !result.ownsReference && result.structInst != nullptr) {
+        Instance_structIncRef(result.structInst);
+        result.ownsReference = true;
     }
 
     // Restore caller frame

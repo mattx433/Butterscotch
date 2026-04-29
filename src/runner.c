@@ -1164,6 +1164,11 @@ static void initRoom(Runner* runner, int32_t roomIndex) {
 
 // Cleans up the runner state, used when freeing the Runner or when restarting the Runner
 static void cleanupState(Runner* runner) {
+    // Drop VM-side RValue holders (globals, stack, call frames) BEFORE freeing any Instance memory. This way any RVALUE_STRUCT refs decrement against still-live struct memory; otherwise we'd free a struct here and then have VM_free's later VM_reset try to decRef a dangling pointer.
+    if (runner->vmContext != nullptr) {
+        VM_reset(runner->vmContext);
+    }
+
     // Free all instances
     repeat(arrlen(runner->instances), i) {
         hmdel(runner->instancesToId, runner->instances[i]->instanceId);
@@ -1192,10 +1197,12 @@ static void cleanupState(Runner* runner) {
     }
     runner->savedRoomStates = nullptr;
 
-    // Free struct instances (created via @@NewGMLObject@@)
+    // Free struct instances (created via @@NewGMLObject@@). Anything still here at shutdown is leaked refs or a reference cycle - bulk free regardless of refCount.
     repeat(arrlen(runner->structInstances), i) {
-        hmdel(runner->instancesToId, runner->structInstances[i]->instanceId);
-        Instance_free(runner->structInstances[i]);
+        Instance* s = runner->structInstances[i];
+        hmdel(runner->instancesToId, s->instanceId);
+        s->structRegistryIndex = -1;
+        Instance_free(s);
     }
     arrfree(runner->structInstances);
     runner->structInstances = nullptr;
@@ -1471,6 +1478,33 @@ RuntimeLayerElement* Runner_findLayerElementById(Runner* runner, int32_t element
 
 uint32_t Runner_getNextLayerId(Runner* runner) {
     return runner->nextLayerId++;
+}
+
+// Reaps GML structs whose only remaining ref is the structInstances registry's implicit +1.
+// Walks backward so that swap-remove of dead entries doesn't disturb the indexes of entries we haven't visited yet.
+static void Runner_sweepDeadStructs(Runner* runner) {
+    int32_t count = (int32_t) arrlen(runner->structInstances);
+    for (int32_t i = count - 1; i >= 0; i--) {
+        Instance* s = runner->structInstances[i];
+        if (s->refCount > 1) continue; // still referenced by user code
+        require(s->refCount == 1);
+
+        // Remove from runner->instancesToId so future findInstanceByTarget(id) returns nullptr.
+        hmdel(runner->instancesToId, s->instanceId);
+
+        // O(1) swap-remove from structInstances, keeping structRegistryIndex in sync.
+        int32_t lastIdx = (int32_t) arrlen(runner->structInstances) - 1;
+        if (i != lastIdx) {
+            Instance* moved = runner->structInstances[lastIdx];
+            runner->structInstances[i] = moved;
+            moved->structRegistryIndex = i;
+        }
+        arrpop(runner->structInstances);
+
+        s->structRegistryIndex = -1;
+        s->refCount = 0; // drop the registry's ref; we are about to free
+        Instance_free(s);
+    }
 }
 
 void Runner_cleanupDestroyedInstances(Runner* runner) {
@@ -2203,6 +2237,7 @@ void Runner_step(Runner* runner) {
     }
 
     Runner_cleanupDestroyedInstances(runner);
+    Runner_sweepDeadStructs(runner);
 
     runner->frameCount++;
 }
@@ -2371,6 +2406,12 @@ static void writeRValueJson(JsonWriter* w, RValue val) {
             break;
         }
 #endif
+        case RVALUE_STRUCT: {
+            char buf[64];
+            snprintf(buf, sizeof(buf), "<struct:%u>", val.structInst != nullptr ? val.structInst->instanceId : 0);
+            JsonWriter_string(w, buf);
+            break;
+        }
     }
 }
 

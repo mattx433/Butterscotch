@@ -53,7 +53,7 @@ static inline RValue IntRValueHashMap_get(const IntRValueHashMap* map, int32_t k
         int32_t slotKey = entries[idx].key;
         if (slotKey == key) {
             RValue result = entries[idx].value;
-            result.ownsString = false;
+            result.ownsReference = false;
             return result;
         }
         if (slotKey == INT_RVALUE_HASHMAP_EMPTY_KEY) return (RValue){ .type = RVALUE_UNDEFINED };

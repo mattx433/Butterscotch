@@ -1,5 +1,4 @@
 #include "gl_legacy_renderer.h"
-#include "common.h"
 #include "matrix_math.h"
 #include "text_utils.h"
 
@@ -44,7 +43,7 @@ static void glInit(Renderer* renderer, DataWin* dataWin) {
     GLLegacyRenderer* gl = (GLLegacyRenderer*) renderer;
     renderer->dataWin = dataWin;
 
-    // Load textures from TXTR pages
+    // Prepare texture slots for lazy loading (PNG decode deferred to first use)
     glEnable(GL_TEXTURE_2D);
     glDisable(GL_DEPTH_TEST);
     glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
@@ -95,7 +94,6 @@ static void glDestroy(Renderer* renderer) {
     free(gl->glTextures);
     free(gl->textureWidths);
     free(gl->textureHeights);
-    free(gl->textureLoaded);
     free(gl);
 }
 
@@ -175,7 +173,26 @@ static void glEndGUI(MAYBE_UNUSED Renderer* renderer) {
     glDisable(GL_SCISSOR_TEST);
 }
 
-static void glEndFrame(MAYBE_UNUSED Renderer* renderer) {}
+static void glEndFrame(Renderer* renderer) {
+    GLLegacyRenderer* gl = (GLLegacyRenderer*) renderer;
+
+    int effectiveEndX, effectiveEndY;
+    int effectiveStartX, effectiveStartY;
+
+    // Try and match the "intended" aspect ratio as closely 
+    // as possible while still fitting on the screen
+    if ((gl->gameW * gl->windowH) / gl->gameH < gl->windowW) {
+        effectiveEndX = (gl->gameW * gl->windowH) / gl->gameH;
+        effectiveEndY = gl->windowH;
+    } else {
+        effectiveEndX = gl->windowW;
+        effectiveEndY = (gl->gameH * gl->windowW) / gl->gameW;
+    }
+    effectiveStartX = (gl->windowW - effectiveEndX) / 2;
+    effectiveStartY = (gl->windowH - effectiveEndY) / 2;
+    effectiveEndX += effectiveStartX;
+    effectiveEndY += effectiveStartY;
+}
 
 static void glRendererFlush(MAYBE_UNUSED Renderer* renderer) {}
 
@@ -199,7 +216,7 @@ static bool ensureTextureLoaded(GLLegacyRenderer* gl, uint32_t pageId) {
 
     gl->textureWidths[pageId] = w;
     gl->textureHeights[pageId] = h;
-
+    
     glBindTexture(GL_TEXTURE_2D, gl->glTextures[pageId]);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -226,6 +243,7 @@ static void glDrawSprite(Renderer* renderer, int32_t tpagIndex, float x, float y
     GLuint texId = gl->glTextures[pageId];
     int32_t texW = gl->textureWidths[pageId];
     int32_t texH = gl->textureHeights[pageId];
+
     glBindTexture(GL_TEXTURE_2D, texId);
 
     // Compute normalized UVs from TPAG source rect
@@ -492,6 +510,7 @@ static void glDrawLineColor(Renderer* renderer, float x1, float y1, float x2, fl
     float px = (-dy / len) * halfW;
     float py = (dx / len) * halfW;
 
+    // Emit quad with per-vertex colors (color1 at start, color2 at end)
     glBindTexture(GL_TEXTURE_2D, gl->whiteTexture);
 
     glBegin(GL_QUADS);
@@ -529,7 +548,7 @@ static void glDrawTriangle(Renderer *renderer, float x1, float y1, float x2, flo
         float r = (float) BGR_R(renderer->drawColor) / 255.0f;
         float g = (float) BGR_G(renderer->drawColor) / 255.0f;
         float b = (float) BGR_B(renderer->drawColor) / 255.0f;
-        
+
         glBindTexture(GL_TEXTURE_2D, gl->whiteTexture);
 
         glBegin(GL_TRIANGLES);
@@ -651,6 +670,8 @@ static void glDrawText(Renderer* renderer, const char* text, float x, float y, f
     // Count lines, treating \r\n and \n\r as single breaks
     int32_t lineCount = TextUtils_countLines(text, textLen);
 
+    // Per-line vertical stride. HTML5 runner's default `linesep` is `max_glyph_height * scaleY`.
+    // We apply scaleY via the transform matrix below, so keep the stride in pre-scale (local) coords.
     float lineStride = TextUtils_lineStride(font);
 
     // Vertical alignment offset
@@ -664,7 +685,8 @@ static void glDrawText(Renderer* renderer, const char* text, float x, float y, f
     Matrix4f transform;
     Matrix4f_setTransform2D(&transform, x, y, xscale * font->scaleX, yscale * font->scaleY, angleRad);
 
-    // Iterate through lines. HTML5 subtracts ascenderOffset from per-line y offset.
+    // Iterate through lines. HTML5 subtracts ascenderOffset from the per-line y offset
+    // (see yyFont.GR_Text_Draw), shifting glyphs up so the baseline aligns with the drawn y.
     float cursorY = valignOffset - (float) font->ascenderOffset;
     int32_t lineStart = 0;
 
@@ -1005,6 +1027,7 @@ static int32_t glCreateSpriteFromSurface(Renderer* renderer, int32_t x, int32_t 
     gl->glTextures[pageId] = newTexId;
     gl->textureWidths[pageId] = w;
     gl->textureHeights[pageId] = h;
+    gl->textureLoaded[pageId] = true;
 
     uint32_t tpagIndex = findOrAllocTpagSlot(dw, gl->originalTpagCount);
     TexturePageItem* tpag = &dw->tpag.items[tpagIndex];
@@ -1077,6 +1100,113 @@ static void glDeleteSprite(Renderer* renderer, int32_t spriteIndex) {
     fprintf(stderr, "GL: Deleted sprite %d\n", spriteIndex);
 }
 
+static GLenum gmsBlendModeToGL(int mode) {
+    switch(mode) {    
+        case bm_zero: return GL_ZERO;
+        case bm_one: return GL_ONE;
+        case bm_src_color: return GL_SRC_COLOR;
+        case bm_inv_src_color: return GL_ONE_MINUS_SRC_COLOR;
+        case bm_src_alpha: return GL_SRC_ALPHA;
+        case bm_inv_src_alpha: return GL_ONE_MINUS_SRC_ALPHA;
+        case bm_dest_alpha: return GL_DST_ALPHA;
+        case bm_inv_dest_alpha: return GL_ONE_MINUS_DST_ALPHA;
+        case bm_dest_color: return GL_DST_COLOR;
+        case bm_inv_dest_color: return GL_ONE_MINUS_DST_COLOR;
+        case bm_src_alpha_sat: return GL_SRC_ALPHA_SATURATE;
+    }
+    return GL_ONE;
+}
+
+static GLenum gmsBlendModeToGLEquation(int mode) {
+    switch (mode) {
+            case bm_normal:
+                return GL_FUNC_ADD;
+            case bm_add:
+                return GL_FUNC_ADD;
+            case bm_subtract:
+                return GL_FUNC_ADD;
+            case bm_reverse_subtract:
+                return GL_FUNC_REVERSE_SUBTRACT;
+            case bm_min:
+                return GL_MIN;
+            case bm_max:
+                return GL_FUNC_ADD;
+            default:
+                return GL_FUNC_ADD;
+    }
+}
+
+static GLenum gmsBlendModeToGLSFactor(int mode) {
+    switch (mode) {
+            case bm_normal:
+                return GL_SRC_ALPHA;
+            case bm_add:
+                return GL_SRC_ALPHA;
+            case bm_subtract:
+                return GL_ZERO;
+            case bm_reverse_subtract:
+                return GL_SRC_ALPHA;
+            case bm_min:
+                return GL_ONE;
+            case bm_max:
+                return GL_SRC_ALPHA;
+            default:
+                return gmsBlendModeToGL(mode);
+    }
+}
+
+static GLenum gmsBlendModeToGLDFactor(int mode) {
+    switch (mode) {
+            case bm_normal:
+                return GL_ONE_MINUS_SRC_ALPHA;
+            case bm_add:
+                return GL_ONE;
+            case bm_subtract:
+                return GL_ONE_MINUS_SRC_COLOR;
+            case bm_reverse_subtract:
+                return GL_ONE;
+            case bm_min:
+                return GL_ONE;
+            case bm_max:
+                return GL_ONE_MINUS_SRC_COLOR;
+            default:
+                return gmsBlendModeToGL(mode);
+    }
+}
+
+static void glGpuSetBlendMode(Renderer* renderer, int32_t mode) {
+    glBlendEquation(
+        gmsBlendModeToGLEquation(mode)
+    );
+    glBlendFunc(
+        gmsBlendModeToGLSFactor(mode), 
+        gmsBlendModeToGLDFactor(mode)
+    );
+}
+
+static void glGpuSetBlendModeExt(Renderer* renderer, int32_t sfactor, int32_t dfactor) {
+    glBlendFunc(
+        gmsBlendModeToGLSFactor(sfactor), 
+        gmsBlendModeToGLDFactor(dfactor)
+    );
+}
+
+static void glGpuSetBlendEnable(Renderer* renderer, bool enable) {
+    enable ? glEnable(GL_BLEND) : glDisable(GL_BLEND);
+}
+
+static void glGpuSetAlphaTestEnable(Renderer* renderer, bool enable) {
+    enable ? glEnable(GL_ALPHA_TEST) : glDisable(GL_ALPHA_TEST);
+}
+
+static void glGpuSetAlphaTestRef(Renderer* renderer, uint8_t ref) {
+    glAlphaFunc(GL_GREATER, ref/255.0f);
+}
+
+static void glGpuSetColorWriteEnable(Renderer* renderer, bool red, bool green, bool blue, bool alpha) {
+    glColorMask(red, green, blue, alpha);
+}
+
 // ===[ Vtable ]===
 
 static RendererVtable glVtable = {
@@ -1100,6 +1230,12 @@ static RendererVtable glVtable = {
     .flush = glRendererFlush,
     .createSpriteFromSurface = glCreateSpriteFromSurface,
     .deleteSprite = glDeleteSprite,
+    .gpuSetBlendMode = glGpuSetBlendMode,
+    .gpuSetBlendModeExt = glGpuSetBlendModeExt,
+    .gpuSetBlendEnable = glGpuSetBlendEnable,
+    .gpuSetAlphaTestEnable = glGpuSetAlphaTestEnable,
+    .gpuSetAlphaTestRef = glGpuSetAlphaTestRef,
+    .gpuSetColorWriteEnable = glGpuSetColorWriteEnable,
     .drawTile = nullptr,
 };
 

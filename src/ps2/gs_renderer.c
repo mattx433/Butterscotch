@@ -1801,6 +1801,13 @@ static void gsDeleteSprite(MAYBE_UNUSED Renderer* renderer, MAYBE_UNUSED int32_t
     // No-op
 }
 
+static void gsGpuSetBlendMode(Renderer* renderer, int32_t mode) {}
+static void gsGpuSetBlendModeExt(Renderer* renderer, int32_t sfactor, int32_t dfactor) {}
+static void gsGpuSetBlendEnable(Renderer* renderer, bool enable) {}
+static void gsGpuSetAlphaTestEnable(Renderer* renderer, bool enable) {}
+static void gsGpuSetAlphaTestRef(Renderer* renderer, uint8_t ref) {}
+static void gsGpuSetColorWriteEnable(Renderer* renderer, bool red, bool green, bool blue, bool alpha) {}
+
 static void gsDrawTile(Renderer* renderer, RoomTile* tile, float offsetX, float offsetY) {
     GsRenderer* gs = (GsRenderer*) renderer;
 
@@ -1877,6 +1884,12 @@ static RendererVtable gsVtable = {
     .flush = gsFlush,
     .createSpriteFromSurface = gsCreateSpriteFromSurface,
     .deleteSprite = gsDeleteSprite,
+    .gpuSetBlendMode = gsGpuSetBlendMode,
+    .gpuSetBlendModeExt = gsGpuSetBlendModeExt,
+    .gpuSetBlendEnable = gsGpuSetBlendEnable,
+    .gpuSetAlphaTestEnable = gsGpuSetAlphaTestEnable,
+    .gpuSetAlphaTestRef = gsGpuSetAlphaTestRef,
+    .gpuSetColorWriteEnable = gsGpuSetColorWriteEnable,
     .drawTile = gsDrawTile,
     .drawTiled = gsDrawTiled,
 };

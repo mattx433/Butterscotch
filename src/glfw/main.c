@@ -657,6 +657,18 @@ int main(int argc, char* argv[]) {
     // Initialize the file system
     GlfwFileSystem* glfwFileSystem = GlfwFileSystem_create(args.dataWinPath);
 
+    if (strcmp(args.renderer, "legacy-gl") == 0) {
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 1);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+        glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_COMPAT_PROFILE);
+    } else {
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+        glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    }
+
     // Init GLFW
     if (!glfwInit()) {
         fprintf(stderr, "Failed to initialize GLFW\n");
@@ -684,15 +696,6 @@ int main(int argc, char* argv[]) {
         } else {
             fprintf(stderr, "Gamepad: SDL gamecontrollerdb.txt not found at %s, using defaults\n", dbPath);
         }
-    }
-
-    if (strcmp(args.renderer, "legacy-gl") == 0) {
-        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_COMPAT_PROFILE);
-    } else {
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
-        glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     }
 
     if (args.headless) {
@@ -937,8 +940,9 @@ int main(int argc, char* argv[]) {
         glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
 
         // Clear the default framebuffer (window background) to black
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        if (!(strcmp(args.renderer, "legacy-gl") == 0)) {
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        }
         glClear(GL_COLOR_BUFFER_BIT);
 
         int32_t gameW = (int32_t) gen8->defaultWindowWidth;
@@ -1050,9 +1054,11 @@ int main(int argc, char* argv[]) {
         if (shouldScreenshot) {
             // Bind FBO so glReadPixels reads from the game's native-resolution texture
             GLRenderer* gl = (GLRenderer*) renderer;
-            glBindFramebuffer(GL_READ_FRAMEBUFFER, gl->fbo);
+            if (!(strcmp(args.renderer, "legacy-gl") == 0))
+                glBindFramebuffer(GL_READ_FRAMEBUFFER, gl->fbo);
             captureScreenshot(args.screenshotPattern, runner->frameCount, gameW, gameH);
-            glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+            if (!(strcmp(args.renderer, "legacy-gl") == 0))
+                glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
         }
 
         if (args.exitAtFrame >= 0 && runner->frameCount >= args.exitAtFrame) {

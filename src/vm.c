@@ -2880,9 +2880,20 @@ static RValue executeLoop(VMContext* ctx) {
                 RValue* slotB = &ctx->stack.slots[ctx->stack.top - 1];
                 uint8_t aType = slotA->type;
                 uint8_t bType = slotB->type;
+                int32_t tmp;
                 if ((aType == RVALUE_INT32 || aType == RVALUE_REAL) && (bType == RVALUE_INT32 || bType == RVALUE_REAL)) {
                     if (aType == RVALUE_INT32 && bType == RVALUE_INT32) {
-                        slotA->int32 = slotA->int32 * slotB->int32;
+                        // The YoYo runner always converts integers to doubles before calculations which avoids the problem
+                        // of having to figure out if a multiplication has to be promoted to int64 first.
+                        // We assume that doing back and forth conversions (and a multiplication) with doubles is slower than
+                        // performing an integer multiply and divide on a CPU with a branch predictor.
+                        tmp = slotA->int32 * slotB->int32;
+                        if (__builtin_expect(((tmp / slotB->int32) != slotA->int32), 0)) {
+                            slotA->type = RVALUE_INT64;
+                            slotA->int64 = (int64_t) slotA->int32 * (int64_t) slotB->int32;
+                        } else {
+                            slotA->int32 = tmp;
+                        }
                     } else {
                         GMLReal aVal = (aType == RVALUE_INT32) ? (GMLReal) slotA->int32 : slotA->real;
                         GMLReal bVal = (bType == RVALUE_INT32) ? (GMLReal) slotB->int32 : slotB->real;

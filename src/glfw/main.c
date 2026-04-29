@@ -32,6 +32,60 @@
 #include "utils.h"
 #include "profiler.h"
 
+static void glfwErrorCallback(int code, const char* description) {
+    fprintf(stderr, "GLFW error 0x%x: %s\n", code, description);
+}
+
+static void APIENTRY glDebugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, MAYBE_UNUSED GLsizei length, const GLchar* message, MAYBE_UNUSED const void* userParam) {
+    const char* sourceStr;
+    switch (source) {
+        case GL_DEBUG_SOURCE_API: sourceStr = "API"; break;
+        case GL_DEBUG_SOURCE_WINDOW_SYSTEM: sourceStr = "Window System"; break;
+        case GL_DEBUG_SOURCE_SHADER_COMPILER: sourceStr = "Shader Compiler"; break;
+        case GL_DEBUG_SOURCE_THIRD_PARTY: sourceStr = "Third Party"; break;
+        case GL_DEBUG_SOURCE_APPLICATION: sourceStr = "Application"; break;
+        case GL_DEBUG_SOURCE_OTHER: sourceStr = "Other"; break;
+        default: sourceStr = "Unknown"; break;
+    }
+
+    const char* typeStr;
+    switch (type) {
+        case GL_DEBUG_TYPE_ERROR: typeStr = "Error"; break;
+        case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR: typeStr = "Deprecated Behaviour"; break;
+        case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR: typeStr = "Undefined Behaviour"; break;
+        case GL_DEBUG_TYPE_PORTABILITY: typeStr = "Portability"; break;
+        case GL_DEBUG_TYPE_PERFORMANCE: typeStr = "Performance"; break;
+        case GL_DEBUG_TYPE_MARKER: typeStr = "Marker"; break;
+        case GL_DEBUG_TYPE_PUSH_GROUP: typeStr = "Push Group"; break;
+        case GL_DEBUG_TYPE_POP_GROUP: typeStr = "Pop Group"; break;
+        case GL_DEBUG_TYPE_OTHER: typeStr = "Other"; break;
+        default: typeStr = "Unknown"; break;
+    }
+
+    const char* severityStr;
+    switch (severity) {
+        case GL_DEBUG_SEVERITY_HIGH: severityStr = "High"; break;
+        case GL_DEBUG_SEVERITY_MEDIUM: severityStr = "Medium"; break;
+        case GL_DEBUG_SEVERITY_LOW: severityStr = "Low"; break;
+        case GL_DEBUG_SEVERITY_NOTIFICATION: severityStr = "Notification"; break;
+        default: severityStr = "Unknown"; break;
+    }
+
+    fprintf(stderr, "[OpenGL %s] id=%u Type: %s; Severity: %s; Message: %.*s\n", sourceStr, id, typeStr, severityStr, (int) length, message);
+}
+
+static void installGLDebugCallback(void) {
+    if (!GLAD_GL_KHR_debug) {
+        fprintf(stderr, "OpenGL debug callback not available (driver does not expose GL_KHR_debug)\n");
+        return;
+    }
+
+    glEnable(GL_DEBUG_OUTPUT);
+    glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+    glDebugMessageCallbackKHR(glDebugCallback, nullptr);
+    glDebugMessageControlKHR(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr, GL_TRUE);
+}
+
 // ===[ COMMAND LINE ARGUMENTS ]===
 typedef struct {
     int key;
@@ -658,6 +712,7 @@ int main(int argc, char* argv[]) {
     GlfwFileSystem* glfwFileSystem = GlfwFileSystem_create(args.dataWinPath);
 
     // Init GLFW
+    glfwSetErrorCallback(glfwErrorCallback);
     if (!glfwInit()) {
         fprintf(stderr, "Failed to initialize GLFW\n");
         DataWin_free(dataWin);
@@ -665,7 +720,8 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    if (strcmp(args.renderer, "legacy-gl") == 0) {
+    bool modernGL = strcmp(args.renderer, "legacy-gl") != 0;
+    if (!modernGL) {
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 1);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
     } else {
@@ -673,6 +729,7 @@ int main(int argc, char* argv[]) {
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
         glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+        glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
     }
 
     // Load SDL gamecontroller mappings
@@ -721,6 +778,10 @@ int main(int argc, char* argv[]) {
         freeCommandLineArgs(&args);
         return 1;
     }
+
+    // Install the OpenGL debug message callback
+    if (modernGL)
+        installGLDebugCallback();
 
     // Initialize the renderer
     Renderer* renderer = nullptr;

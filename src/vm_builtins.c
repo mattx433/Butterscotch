@@ -1445,12 +1445,12 @@ static RValue builtinStringDigits(MAYBE_UNUSED VMContext* ctx, RValue* args, int
     int len = strlen(str);
     char* result = (char*)malloc(len + 1);
     if (result == NULL) return RValue_makeOwnedString(safeStrdup(""));
-    
+
     int digitCount = 0;
     for (int i = 0; str[i] != '\0'; i++) {
         if (isdigit(str[i])) result[digitCount++] = str[i];
     }
-    
+
     free(str);
     result[digitCount] = '\0';
 
@@ -1458,7 +1458,7 @@ static RValue builtinStringDigits(MAYBE_UNUSED VMContext* ctx, RValue* args, int
         free(result);
         return RValue_makeOwnedString(safeStrdup(""));
     }
-    
+
     char* exact_result = (char*)realloc(result, digitCount + 1);
     return RValue_makeOwnedString(exact_result ? exact_result : result);
 }
@@ -4062,7 +4062,7 @@ static RValue builtinWindowSetCaption(VMContext* ctx, MAYBE_UNUSED RValue* args,
         runner->setWindowTitle(runner->nativeWindow, windowTitle);
         printf("GL: Window title set to: %s\n", val);
     }
-    
+
     free(val);
     return RValue_makeUndefined();
 }
@@ -5178,7 +5178,7 @@ static RValue builtin_drawRectangle(VMContext* ctx, RValue* args, MAYBE_UNUSED i
     return RValue_makeUndefined();
 }
 
-static RValue builtin_drawRectangleColor(VMContext* ctx, RValue* args, MAYBE_UNUSED int32_t argCount) { 
+static RValue builtin_drawRectangleColor(VMContext* ctx, RValue* args, MAYBE_UNUSED int32_t argCount) {
     Runner* runner = (Runner*) ctx->runner;
     if (runner->renderer == nullptr) return RValue_makeUndefined();
 
@@ -5213,7 +5213,7 @@ static RValue builtin_drawHealthbar(VMContext* ctx, RValue* args, MAYBE_UNUSED i
     uint32_t intermediateColor = Renderer_mixColors(minCol,maxCol,amount);
 
     int32_t direction = RValue_toInt32(args[8]);
-    
+
     bool showBack = RValue_toBool(args[9]);
 
     if (showBack) {
@@ -6025,7 +6025,7 @@ static RValue builtinCollisionLine(VMContext* ctx, RValue* args, int32_t argCoun
             continue;
         if (lineTop >= bbox.bottom)
             continue;
-        
+
         // Normalize line left-to-right for clipping
         GMLReal xl = lx1, yl = ly1, xr = lx2, yr = ly2;
         if (xl > xr) { GMLReal tmp = xl; xl = xr; xr = tmp; tmp = yl; yl = yr; yr = tmp; }
@@ -7451,133 +7451,191 @@ static RValue builtinMpGridDraw(MAYBE_UNUSED VMContext* ctx, MAYBE_UNUSED RValue
 static RValue builtinMpGridPath(VMContext* ctx, RValue* args, int32_t argCount) {
     if (7 > argCount) return RValue_makeBool(false);
     Runner* runner = (Runner*) ctx->runner;
-    MpGrid* g = mpGridGet(runner, RValue_toInt32(args[0]));
-    if (g == nullptr) return RValue_makeBool(false);
+    MpGrid* mp = mpGridGet(runner, RValue_toInt32(args[0]));
+    if (mp == nullptr) return RValue_makeBool(false);
     int32_t pathIdx = RValue_toInt32(args[1]);
     if (0 > pathIdx || (uint32_t) pathIdx >= runner->dataWin->path.count) return RValue_makeBool(false);
-    GamePath* outPath = &runner->dataWin->path.paths[pathIdx];
+    GamePath* pPath = &runner->dataWin->path.paths[pathIdx];
 
-    GMLReal xs = RValue_toReal(args[2]);
-    GMLReal ys = RValue_toReal(args[3]);
-    GMLReal xg = RValue_toReal(args[4]);
-    GMLReal yg = RValue_toReal(args[5]);
-    bool allowDiag = RValue_toBool(args[6]);
+    GMLReal xstart = RValue_toReal(args[2]);
+    GMLReal ystart = RValue_toReal(args[3]);
+    GMLReal xgoal  = RValue_toReal(args[4]);
+    GMLReal ygoal  = RValue_toReal(args[5]);
+    bool allowdiag = RValue_toBool(args[6]);
 
-    int32_t sx = (int32_t) GMLReal_floor((xs - g->left) / g->cellWidth);
-    int32_t sy = (int32_t) GMLReal_floor((ys - g->top) / g->cellHeight);
-    int32_t gx = (int32_t) GMLReal_floor((xg - g->left) / g->cellWidth);
-    int32_t gy = (int32_t) GMLReal_floor((yg - g->top) / g->cellHeight);
+    // Find the start & goal cells & check them.
+    int32_t cxs = (int32_t) GMLReal_floor((xstart - mp->left) / mp->cellWidth);
+    int32_t cys = (int32_t) GMLReal_floor((ystart - mp->top)  / mp->cellHeight);
+    int32_t cxg = (int32_t) GMLReal_floor((xgoal  - mp->left) / mp->cellWidth);
+    int32_t cyg = (int32_t) GMLReal_floor((ygoal  - mp->top)  / mp->cellHeight);
 
-    if (sx < 0 || sx >= g->hcells || sy < 0 || sy >= g->vcells) return RValue_makeBool(false);
-    if (gx < 0 || gx >= g->hcells || gy < 0 || gy >= g->vcells) return RValue_makeBool(false);
-    if (g->cells[sx * g->vcells + sy]) return RValue_makeBool(false);
-    if (g->cells[gx * g->vcells + gy]) return RValue_makeBool(false);
+    if (cxs < 0 || cxs >= mp->hcells || cys < 0 || cys >= mp->vcells) return RValue_makeBool(false);
+    if (cxg < 0 || cxg >= mp->hcells || cyg < 0 || cyg >= mp->vcells) return RValue_makeBool(false);
+    if (mp->cells[cxs * mp->vcells + cys]) return RValue_makeBool(false);
+    if (mp->cells[cxg * mp->vcells + cyg]) return RValue_makeBool(false);
 
-    int32_t total = g->hcells * g->vcells;
-    int32_t* parent = (int32_t*) malloc(total * sizeof(int32_t));
-    int32_t* queue = (int32_t*) malloc(total * sizeof(int32_t));
-    if (parent == nullptr || queue == nullptr) {
-        free(parent); free(queue);
+    // Start the search.
+    int32_t total = mp->hcells * mp->vcells;
+    int32_t* dist = (int32_t*) malloc(total * sizeof(int32_t));
+    int32_t* qq   = (int32_t*) malloc(total * sizeof(int32_t));
+    if (dist == nullptr || qq == nullptr) {
+        free(dist); free(qq);
         return RValue_makeBool(false);
     }
-    for (int32_t i = 0; total > i; i++) parent[i] = -1;
+    for (int32_t i = 0; total > i; i++) dist[i] = -1;
 
-    int32_t startIdx = sx * g->vcells + sy;
-    int32_t goalIdx = gx * g->vcells + gy;
+    int32_t startIdx = cxs * mp->vcells + cys;
+    int32_t goalIdx  = cxg * mp->vcells + cyg;
     int32_t head = 0, tail = 0;
-    queue[tail++] = startIdx;
-    parent[startIdx] = startIdx;
+    dist[startIdx] = 1;
+    qq[tail++] = startIdx;
 
-    int32_t dx4[4] = { 1, -1, 0, 0 };
-    int32_t dy4[4] = { 0, 0, 1, -1 };
-    int32_t dx8[8] = { 1, -1, 0, 0, 1, 1, -1, -1 };
-    int32_t dy8[8] = { 0, 0, 1, -1, 1, -1, 1, -1 };
-    int32_t* dxs = allowDiag ? dx8 : dx4;
-    int32_t* dys = allowDiag ? dy8 : dy4;
-    int32_t dirCount = allowDiag ? 8 : 4;
-
-    bool found = false;
+    bool result = false;
     while (tail > head) {
-        int32_t cur = queue[head++];
-        if (cur == goalIdx) { found = true; break; }
-        int32_t cxx = cur / g->vcells;
-        int32_t cyy = cur % g->vcells;
-        for (int32_t d = 0; dirCount > d; d++) {
-            int32_t nx = cxx + dxs[d];
-            int32_t ny = cyy + dys[d];
-            if (nx < 0 || ny < 0 || nx >= g->hcells || ny >= g->vcells) continue;
-            int32_t nidx = nx * g->vcells + ny;
-            if (parent[nidx] != -1) continue;
-            if (g->cells[nidx]) continue;
-            // For diagonal moves, require both cardinal neighbors to be clear
-            if (allowDiag && d >= 4) {
-                int32_t aIdx = cxx * g->vcells + ny;
-                int32_t bIdx = nx * g->vcells + cyy;
-                if (g->cells[aIdx] || g->cells[bIdx]) continue;
-            }
-            parent[nidx] = cur;
-            queue[tail++] = nidx;
+        int32_t val = qq[head++];
+        int32_t xx = val / mp->vcells;
+        int32_t yy = val % mp->vcells;
+        if (xx == cxg && yy == cyg) {
+            result = true;
+            break;
+        }
+        int32_t d = dist[val] + 1;
+
+        bool f1 = (xx > 0) && (yy < mp->vcells - 1) && (dist[(xx - 1) * mp->vcells + (yy + 1)] == -1) && !mp->cells[(xx - 1) * mp->vcells + (yy + 1)];
+        bool f2 = (yy < mp->vcells - 1) && (dist[xx * mp->vcells + (yy + 1)] == -1) && !mp->cells[xx * mp->vcells + (yy + 1)];
+        bool f3 = (xx < mp->hcells - 1) && (yy < mp->vcells - 1) && (dist[(xx + 1) * mp->vcells + (yy + 1)] == -1) && !mp->cells[(xx + 1) * mp->vcells + (yy + 1)];
+        bool f4 = (xx > 0) && (dist[(xx - 1) * mp->vcells + yy] == -1) && !mp->cells[(xx - 1) * mp->vcells + yy];
+        bool f6 = (xx < mp->hcells - 1) && (dist[(xx + 1) * mp->vcells + yy] == -1) && !mp->cells[(xx + 1) * mp->vcells + yy];
+        bool f7 = (xx > 0) && (yy > 0) && (dist[(xx - 1) * mp->vcells + (yy - 1)] == -1) && !mp->cells[(xx - 1) * mp->vcells + (yy - 1)];
+        bool f8 = (yy > 0) && (dist[xx * mp->vcells + (yy - 1)] == -1) && !mp->cells[xx * mp->vcells + (yy - 1)];
+        bool f9 = (xx < mp->hcells - 1) && (yy > 0) && (dist[(xx + 1) * mp->vcells + (yy - 1)] == -1) && !mp->cells[(xx + 1) * mp->vcells + (yy - 1)];
+
+        // Handle horizontal & vertical moves.
+        if (f4) {
+            dist[(xx - 1) * mp->vcells + yy] = d;
+            qq[tail++] = (xx - 1) * mp->vcells + yy;
+        }
+        if (f6) {
+            dist[(xx + 1) * mp->vcells + yy] = d;
+            qq[tail++] = (xx + 1) * mp->vcells + yy;
+        }
+        if (f8) {
+            dist[xx * mp->vcells + (yy - 1)] = d;
+            qq[tail++] = xx * mp->vcells + (yy - 1);
+        }
+        if (f2) {
+            dist[xx * mp->vcells + (yy + 1)] = d;
+            qq[tail++] = xx * mp->vcells + (yy + 1);
+        }
+        // Handle diagonal moves (require both cardinal neighbors clear, matching HTML5).
+        if (allowdiag && f1 && f2 && f4) {
+            dist[(xx - 1) * mp->vcells + (yy + 1)] = d;
+            qq[tail++] = (xx - 1) * mp->vcells + (yy + 1);
+        }
+        if (allowdiag && f7 && f8 && f4) {
+            dist[(xx - 1) * mp->vcells + (yy - 1)] = d;
+            qq[tail++] = (xx - 1) * mp->vcells + (yy - 1);
+        }
+        if (allowdiag && f3 && f2 && f6) {
+            dist[(xx + 1) * mp->vcells + (yy + 1)] = d;
+            qq[tail++] = (xx + 1) * mp->vcells + (yy + 1);
+        }
+        if (allowdiag && f9 && f8 && f6) {
+            dist[(xx + 1) * mp->vcells + (yy - 1)] = d;
+            qq[tail++] = (xx + 1) * mp->vcells + (yy - 1);
         }
     }
 
-    if (!found) {
-        free(parent); free(queue);
+    if (!result) {
+        free(dist); free(qq);
         return RValue_makeBool(false);
     }
 
-    // Reconstruct path from goal back to start
+    // Compute the path from back to front. At each step, scan neighbors with dist == val-1 in the order LEFT, RIGHT, UP, DOWN, then diagonals
     int32_t chainCap = 16;
     int32_t chainLen = 0;
     int32_t* chain = (int32_t*) malloc(chainCap * sizeof(int32_t));
-    int32_t node = goalIdx;
-    while (true) {
-        if (chainLen >= chainCap) {
-            chainCap *= 2;
-            chain = (int32_t*) realloc(chain, chainCap * sizeof(int32_t));
+    {
+        int32_t xx = cxg;
+        int32_t yy = cyg;
+        chain[chainLen++] = xx * mp->vcells + yy;
+        while (xx != cxs || yy != cys) {
+            if (chainLen >= chainCap) {
+                chainCap *= 2;
+                chain = (int32_t*) realloc(chain, chainCap * sizeof(int32_t));
+            }
+            int32_t val = dist[xx * mp->vcells + yy];
+            bool f1 = (xx > 0) && (yy < mp->vcells - 1) && (dist[(xx - 1) * mp->vcells + (yy + 1)] == val - 1);
+            bool f2 = (yy < mp->vcells - 1) && (dist[xx * mp->vcells + (yy + 1)] == val - 1);
+            bool f3 = (xx < mp->hcells - 1) && (yy < mp->vcells - 1) && (dist[(xx + 1) * mp->vcells + (yy + 1)] == val - 1);
+            bool f4 = (xx > 0) && (dist[(xx - 1) * mp->vcells + yy] == val - 1);
+            bool f6 = (xx < mp->hcells - 1) && (dist[(xx + 1) * mp->vcells + yy] == val - 1);
+            bool f7 = (xx > 0) && (yy > 0) && (dist[(xx - 1) * mp->vcells + (yy - 1)] == val - 1);
+            bool f8 = (yy > 0) && (dist[xx * mp->vcells + (yy - 1)] == val - 1);
+            bool f9 = (xx < mp->hcells - 1) && (yy > 0) && (dist[(xx + 1) * mp->vcells + (yy - 1)] == val - 1);
+
+            // Four directions movement
+            if (f4) { xx = xx - 1; } else if (f6) { xx = xx + 1; } else if (f8) { yy = yy - 1; } else if (f2) { yy = yy + 1; } else if (allowdiag && f1) {
+                xx = xx - 1;
+                yy = yy + 1;
+            } else if (allowdiag && f3) {
+                xx = xx + 1;
+                yy = yy + 1;
+            } else if (allowdiag && f7) {
+                xx = xx - 1;
+                yy = yy - 1;
+            } else if (allowdiag && f9) {
+                xx = xx + 1;
+                yy = yy - 1;
+            } else {
+                // Should be unreachable: BFS reached goal, so a predecessor must exist.
+                free(chain);
+                free(dist);
+                free(qq);
+                return RValue_makeBool(false);
+            }
+            chain[chainLen++] = xx * mp->vcells + yy;
         }
-        chain[chainLen++] = node;
-        if (node == startIdx) break;
-        node = parent[node];
     }
 
-    // Clear old path and add points in forward order
-    free(outPath->points);
-    outPath->points = nullptr;
-    outPath->pointCount = 0;
+    // Build the output path.
+    // We walk "chain" in reverse to emit start-first, with explicit overrides so the endpoints are exactly (xstart, ystart) / (xgoal, ygoal) instead of cell centers.
+    free(pPath->points);
+    pPath->points = nullptr;
+    pPath->pointCount = 0;
 
     // When start cell == goal cell, chain has 1 node but the native runner and GameMaker-HTML5 still emit a 2-point path (start coord + goal coord).
     // Without this, the path length is 0, adaptPath early-returns before advancing pathPosition past 1.0, and the OTHER_END_OF_PATH event never fires.
     int32_t pointCount = (startIdx == goalIdx) ? 2 : chainLen;
-    outPath->points = (PathPoint*) malloc(pointCount * sizeof(PathPoint));
-    outPath->pointCount = (uint32_t) pointCount;
+    pPath->points = (PathPoint*) malloc(pointCount * sizeof(PathPoint));
+    pPath->pointCount = (uint32_t) pointCount;
     for (int32_t i = 0; pointCount > i; i++) {
         float wx, wy;
         if (startIdx == goalIdx) {
-            wx = (float) (i == 0 ? xs : xg);
-            wy = (float) (i == 0 ? ys : yg);
+            wx = (float) (i == 0 ? xstart : xgoal);
+            wy = (float) (i == 0 ? ystart : ygoal);
         } else {
             int32_t idx = chain[chainLen - 1 - i];
-            int32_t cxx = idx / g->vcells;
-            int32_t cyy = idx % g->vcells;
-            wx = (float) (g->left + (cxx + 0.5) * g->cellWidth);
-            wy = (float) (g->top + (cyy + 0.5) * g->cellHeight);
-            // Override endpoints with exact start/goal coords so the instance aligns
-            if (i == 0) { wx = (float) xs; wy = (float) ys; }
-            if (i == chainLen - 1) { wx = (float) xg; wy = (float) yg; }
+            int32_t xx = idx / mp->vcells;
+            int32_t yy = idx % mp->vcells;
+            wx = (float) (mp->left + (xx + 0.5) * mp->cellWidth);
+            wy = (float) (mp->top  + (yy + 0.5) * mp->cellHeight);
+            if (i == 0)              { wx = (float) xstart; wy = (float) ystart; }
+            if (i == chainLen - 1)   { wx = (float) xgoal;  wy = (float) ygoal;  }
         }
-        outPath->points[i].x = wx;
-        outPath->points[i].y = wy;
-        outPath->points[i].speed = 100.0f;
+        pPath->points[i].x = wx;
+        pPath->points[i].y = wy;
+        pPath->points[i].speed = 100.0f;
     }
     free(chain);
-    free(parent);
-    free(queue);
+    free(dist);
+    free(qq);
 
-    free(outPath->internalPoints);
-    outPath->internalPoints = nullptr;
-    outPath->internalPointCount = 0;
-    outPath->length = 0.0;
-    GamePath_computeInternal(outPath);
+    free(pPath->internalPoints);
+    pPath->internalPoints = nullptr;
+    pPath->internalPointCount = 0;
+    pPath->length = 0.0f;
+    GamePath_computeInternal(pPath);
 
     return RValue_makeBool(true);
 }
@@ -7654,7 +7712,7 @@ static RValue builtinPathEnd(VMContext* ctx, MAYBE_UNUSED RValue* args, MAYBE_UN
 }
 
 // string_hash_to_newline - converts # to \n in a string
-static RValue builtinStringHashToNewline(MAYBE_UNUSED VMContext* ctx, RValue* args, int32_t argCount) { 
+static RValue builtinStringHashToNewline(MAYBE_UNUSED VMContext* ctx, RValue* args, int32_t argCount) {
     if (1 > argCount) return RValue_makeString("");
     RValue original = args[0]; // This is a copy
 

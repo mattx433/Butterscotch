@@ -156,12 +156,8 @@ static inline bool Collision_instancesOverlapPrecise(DataWin* dataWin, bool comp
     GMLReal iTop    = GMLReal_fmax(bboxA.top, bboxB.top);
     GMLReal iBottom = GMLReal_fmin(bboxA.bottom, bboxB.bottom);
 
-    // In GMS legacy collision compatibility mode, touching edges count as overlap.
-    if (compatMode) {
-        if (iLeft > iRight || iTop > iBottom) return false;
-    } else {
-        if (iLeft >= iRight || iTop >= iBottom) return false;
-    }
+    // AABB overlap test. Native uses identical semantics in both modern and compat for axis-aligned integer-coordinate cases (compat shifts bbox.right/bottom by -1 *and* the test by +1, which cancel).
+    if (iLeft >= iRight || iTop >= iBottom) return false;
 
     Sprite* sprA = Collision_getSprite(dataWin, a);
     Sprite* sprB = Collision_getSprite(dataWin, b);
@@ -172,15 +168,29 @@ static inline bool Collision_instancesOverlapPrecise(DataWin* dataWin, bool comp
     bool preciseB = Collision_hasFrameMasks(sprB);
     if (!preciseA && !preciseB) return true;
 
-    int32_t startX = (int32_t) GMLReal_floor(iLeft);
-    int32_t endX   = (int32_t) GMLReal_ceil(iRight);
-    int32_t startY = (int32_t) GMLReal_floor(iTop);
-    int32_t endY   = (int32_t) GMLReal_ceil(iBottom);
+    // Pixel scan over the AABB intersection.
+    // Modern: floor..ceil with exclusive upper bound, sample pixel centers (+0.5).
+    // Compatibility: truncated int range with inclusive upper bound, sample pixel corners (no +0.5).
+    int32_t startX, endX, startY, endY;
+    GMLReal sampleOffset;
+    if (compatMode) {
+        startX = (int32_t) iLeft;
+        endX   = (int32_t) iRight;
+        startY = (int32_t) iTop;
+        endY   = (int32_t) iBottom;
+        sampleOffset = 0.0;
+    } else {
+        startX = (int32_t) GMLReal_floor(iLeft);
+        endX   = (int32_t) GMLReal_ceil(iRight);
+        startY = (int32_t) GMLReal_floor(iTop);
+        endY   = (int32_t) GMLReal_ceil(iBottom);
+        sampleOffset = 0.5;
+    }
 
-    for (int32_t py = startY; endY > py; py++) {
-        for (int32_t px = startX; endX > px; px++) {
-            GMLReal wpx = (GMLReal) px + 0.5;
-            GMLReal wpy = (GMLReal) py + 0.5;
+    for (int32_t py = startY; (compatMode ? py <= endY : py < endY); py++) {
+        for (int32_t px = startX; (compatMode ? px <= endX : px < endX); px++) {
+            GMLReal wpx = (GMLReal) px + sampleOffset;
+            GMLReal wpy = (GMLReal) py + sampleOffset;
 
             if (!Collision_pointInInstance(sprA, a, wpx, wpy)) continue;
             if (!Collision_pointInInstance(sprB, b, wpx, wpy)) continue;

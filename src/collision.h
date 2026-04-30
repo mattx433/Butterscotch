@@ -149,14 +149,19 @@ static inline bool Collision_pointInInstance(Sprite* spr, Instance* inst, GMLRea
 //      pixel via Collision_pointInInstance. Both sides get inverse-transformed
 //      regardless of whether they're individually precise, so a rotated
 //      non-precise sprite collides as an OBB as long as its partner is precise.
-static inline bool Collision_instancesOverlapPrecise(DataWin* dataWin, Instance* a, Instance* b, InstanceBBox bboxA, InstanceBBox bboxB) {
+static inline bool Collision_instancesOverlapPrecise(DataWin* dataWin, bool compatMode, Instance* a, Instance* b, InstanceBBox bboxA, InstanceBBox bboxB) {
     // Compute world-space intersection of the two AABBs
     GMLReal iLeft   = GMLReal_fmax(bboxA.left, bboxB.left);
     GMLReal iRight  = GMLReal_fmin(bboxA.right, bboxB.right);
     GMLReal iTop    = GMLReal_fmax(bboxA.top, bboxB.top);
     GMLReal iBottom = GMLReal_fmin(bboxA.bottom, bboxB.bottom);
 
-    if (iLeft >= iRight || iTop >= iBottom) return false;
+    // In GMS legacy collision compatibility mode, touching edges count as overlap.
+    if (compatMode) {
+        if (iLeft > iRight || iTop > iBottom) return false;
+    } else {
+        if (iLeft >= iRight || iTop >= iBottom) return false;
+    }
 
     Sprite* sprA = Collision_getSprite(dataWin, a);
     Sprite* sprB = Collision_getSprite(dataWin, b);

@@ -400,6 +400,9 @@ typedef struct Runner {
     // GUI layer size (display_set_gui_size). 0 = auto-match the current view's port size.
     int32_t guiWidth;
     int32_t guiHeight;
+
+    // GMS legacy (pre 2022.1) collision behavior: AABB overlap treats touching edges as overlap.
+    bool collisionCompatibilityMode;
 } Runner;
 
 const char* Runner_getEventName(int32_t eventType, int32_t eventSubtype);

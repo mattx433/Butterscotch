@@ -1378,6 +1378,9 @@ Runner* Runner_create(DataWin* dataWin, VMContext* vm, Renderer* renderer, FileS
     runner->keyboard = RunnerKeyboard_create();
     runner->gamepads = RunnerGamepad_create();
 
+    // Collision compatibility mode is "enabled" for all pre-GM 2022.1 games AND for any post-GM 2022.1 games that have the bit 27 set
+    runner->collisionCompatibilityMode = (dataWin->detectedFormat.major == 1) || (((dataWin->optn.info >> 27) & 1) != 0);
+
     // Build the event dispatch acceleration tables.
     EventSlotMap_build(&runner->eventSlotMap, dataWin);
     ResolvedEventTable_build(&runner->eventTable, dataWin, &runner->eventSlotMap);
@@ -1783,7 +1786,7 @@ static void dispatchCollisionEvents(Runner* runner) {
                     bool needsPrecise = (sprSelf != nullptr && sprSelf->sepMasks == 1) || (sprOther != nullptr && sprOther->sepMasks == 1);
 
                     if (needsPrecise) {
-                        if (!Collision_instancesOverlapPrecise(dataWin, self, other, bboxSelf, bboxOther)) continue;
+                        if (!Collision_instancesOverlapPrecise(dataWin, runner->collisionCompatibilityMode, self, other, bboxSelf, bboxOther)) continue;
                     }
 
                     // Collision detected! If either instance is solid, restore both to xprevious/yprevious.

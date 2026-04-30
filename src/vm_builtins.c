@@ -2742,7 +2742,7 @@ static RValue builtinPlaceFree(VMContext* ctx, RValue* args, int32_t argCount) {
             InstanceBBox otherBBox = Collision_computeBBox(runner->dataWin, other);
             if (!otherBBox.valid) continue;
 
-            if (Collision_instancesOverlapPrecise(runner->dataWin, caller, other, callerBBox, otherBBox)) {
+            if (Collision_instancesOverlapPrecise(runner->dataWin, runner->collisionCompatibilityMode, caller, other, callerBBox, otherBBox)) {
                 free = false;
                 break;
             }
@@ -2775,7 +2775,7 @@ static bool placeEmptyAt(Runner* runner, Instance* caller, GMLReal testX, GMLRea
             InstanceBBox otherBBox = Collision_computeBBox(runner->dataWin, other);
             if (!otherBBox.valid) continue;
 
-            if (Collision_instancesOverlapPrecise(runner->dataWin, caller, other, callerBBox, otherBBox)) {
+            if (Collision_instancesOverlapPrecise(runner->dataWin, runner->collisionCompatibilityMode, caller, other, callerBBox, otherBBox)) {
                 empty = false;
                 break;
             }
@@ -2806,7 +2806,7 @@ static bool placeFreeAt(Runner* runner, Instance* caller, GMLReal testX, GMLReal
             InstanceBBox otherBBox = Collision_computeBBox(runner->dataWin, other);
             if (!otherBBox.valid) continue;
 
-            if (Collision_instancesOverlapPrecise(runner->dataWin, caller, other, callerBBox, otherBBox)) {
+            if (Collision_instancesOverlapPrecise(runner->dataWin, runner->collisionCompatibilityMode, caller, other, callerBBox, otherBBox)) {
                 free = false;
                 break;
             }
@@ -2838,7 +2838,7 @@ static bool noCollisionWithObject(Runner* runner, Instance* caller, GMLReal test
             InstanceBBox otherBBox = Collision_computeBBox(runner->dataWin, other);
             if (!otherBBox.valid) continue;
 
-            if (Collision_instancesOverlapPrecise(runner->dataWin, caller, other, callerBBox, otherBBox)) {
+            if (Collision_instancesOverlapPrecise(runner->dataWin, runner->collisionCompatibilityMode, caller, other, callerBBox, otherBBox)) {
                 free = false;
                 break;
             }
@@ -5969,7 +5969,7 @@ static RValue builtinPlaceMeeting(VMContext* ctx, RValue* args, int32_t argCount
                     InstanceBBox otherBBox = Collision_computeBBox(runner->dataWin, other);
                     if (!otherBBox.valid) continue;
 
-                    if (Collision_instancesOverlapPrecise(runner->dataWin, caller, other, callerBBox, otherBBox)) {
+                    if (Collision_instancesOverlapPrecise(runner->dataWin, runner->collisionCompatibilityMode, caller, other, callerBBox, otherBBox)) {
                         found = true;
                         break;
                     }
@@ -6325,7 +6325,7 @@ static RValue builtinInstancePlace(VMContext* ctx, RValue* args, int32_t argCoun
                     InstanceBBox otherBBox = Collision_computeBBox(runner->dataWin, other);
                     if (!otherBBox.valid) continue;
 
-                    if (Collision_instancesOverlapPrecise(runner->dataWin, caller, other, callerBBox, otherBBox)) {
+                    if (Collision_instancesOverlapPrecise(runner->dataWin, runner->collisionCompatibilityMode, caller, other, callerBBox, otherBBox)) {
                         resultId = other->instanceId;
                         break;
                     }

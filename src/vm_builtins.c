@@ -1751,6 +1751,17 @@ static RValue builtinPointDistance(MAYBE_UNUSED VMContext* ctx, RValue* args, in
     return RValue_makeReal(GMLReal_sqrt(dx * dx + dy * dy));
 }
 
+static RValue builtinPointInRectangle(MAYBE_UNUSED VMContext* ctx, RValue* args, int32_t argCount) {
+    if (6 > argCount) return RValue_makeBool(false);
+    GMLReal px = RValue_toReal(args[0]);
+    GMLReal py = RValue_toReal(args[1]);
+    GMLReal x1 = RValue_toReal(args[2]);
+    GMLReal y1 = RValue_toReal(args[3]);
+    GMLReal x2 = RValue_toReal(args[4]);
+    GMLReal y2 = RValue_toReal(args[5]);
+    return RValue_makeBool(px >= x1 && px <= x2 && py >= y1 && py <= y2);
+}
+
 static RValue builtinDistanceToPoint(VMContext* ctx, RValue* args, int32_t argCount) {
     if (2 > argCount) return RValue_makeReal(0.0);
     GMLReal px = RValue_toReal(args[0]);
@@ -8267,6 +8278,7 @@ void VMBuiltins_registerAll(VMContext* ctx) {
     VM_registerBuiltin(ctx, "clamp", builtinClamp);
     VM_registerBuiltin(ctx, "lerp", builtinLerp);
     VM_registerBuiltin(ctx, "point_distance", builtinPointDistance);
+    VM_registerBuiltin(ctx, "point_in_rectangle", builtinPointInRectangle);
     VM_registerBuiltin(ctx, "point_direction", builtinPointDirection);
     VM_registerBuiltin(ctx, "angle_difference", builtinAngleDifference);
     VM_registerBuiltin(ctx, "distance_to_point", builtinDistanceToPoint);

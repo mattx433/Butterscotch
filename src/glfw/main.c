@@ -1197,6 +1197,7 @@ int main(int argc, char* argv[]) {
             bool fastForwardTabNow = glfwGetKey(window, GLFW_KEY_TAB) == GLFW_PRESS;
             if (args.fastForwardSpeed > 0.0 && fastForwardTabNow && !fastForwardTabPrev) {
                 fastForwardActive = !fastForwardActive;
+                lastFrameTime = glfwGetTime();
             }
             fastForwardTabPrev = fastForwardTabNow;
             double effectiveSpeed = (args.fastForwardSpeed > 0.0 && fastForwardActive) ? args.fastForwardSpeed : args.speedMultiplier;

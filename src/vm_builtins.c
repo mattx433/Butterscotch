@@ -1425,6 +1425,33 @@ static RValue builtinStringCopy(MAYBE_UNUSED VMContext* ctx, RValue* args, int32
     return RValue_makeOwnedString(result);
 }
 
+static RValue builtinStringFormat(MAYBE_UNUSED VMContext* ctx, RValue* args, int32_t argCount) {
+    if (3 > argCount) return RValue_makeOwnedString(safeStrdup(""));
+    if (args[0].type == RVALUE_UNDEFINED) return RValue_makeOwnedString(safeStrdup("undefined"));
+
+    GMLReal val = RValue_toReal(args[0]);
+    int32_t tot = RValue_toInt32(args[1]);
+    int32_t dec = RValue_toInt32(args[2]);
+    if (0 > dec) dec = 0;
+    if (15 < dec) dec = 15;
+
+    char numBuf[64];
+    snprintf(numBuf, sizeof(numBuf), "%.*f", (int) dec, (double) val);
+
+    const char* dot = strchr(numBuf, '.');
+    int32_t intLen = (int32_t) (dot ? (dot - numBuf) : (int32_t) strlen(numBuf));
+
+    int32_t leftPad = (tot > intLen) ? (tot - intLen) : 0;
+    int32_t numLen = (int32_t) strlen(numBuf);
+    int32_t totalLen = leftPad + numLen;
+
+    char* result = safeMalloc(totalLen + 1);
+    for (int32_t i = 0; leftPad > i; i++) result[i] = ' ';
+    memcpy(result + leftPad, numBuf, (size_t) numLen);
+    result[totalLen] = '\0';
+    return RValue_makeOwnedString(result);
+}
+
 static RValue builtinStringRepeat(MAYBE_UNUSED VMContext* ctx, RValue* args, int32_t argCount) {
     if (2 > argCount) return RValue_makeOwnedString(safeStrdup(""));
     char* str = RValue_toString(args[0]);
@@ -8326,6 +8353,7 @@ void VMBuiltins_registerAll(VMContext* ctx) {
     VM_registerBuiltin(ctx, "string_replace", builtinStringReplace);
     VM_registerBuiltin(ctx, "string_replace_all", builtinStringReplaceAll);
     VM_registerBuiltin(ctx, "string_repeat", builtinStringRepeat);
+    VM_registerBuiltin(ctx, "string_format", builtinStringFormat);
     VM_registerBuiltin(ctx, "string_count", builtinStringCount);
     VM_registerBuiltin(ctx, "string_digits", builtinStringDigits);
     VM_registerBuiltin(ctx, "ord", builtinOrd);
